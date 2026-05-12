@@ -62,6 +62,15 @@ reference_evaluation/
 
 `task1_nomap_reference/eval_task1_nomap_reference.py` contains the Task 1 evaluation code.
 
+OpenPI source interface:
+
+- Default: use the bundled minimal runtime at `third_party/openpi_minimal`.
+- Optional: use your own OpenPI source tree by setting `OPENPI_ROOT`.
+- Required entries under `OPENPI_ROOT`:
+  - `scripts/serve_policy.py`
+  - `packages/openpi/src`
+  - `packages/openpi-client/src`
+
 Required local environment variables:
 
 ```bash
@@ -90,6 +99,11 @@ checkpoint params.
 ## Tasks 2-26 Evaluation Code
 
 The VLM5 Tasks 2-26 evaluation code currently lives in `tasks2_26_vlm5_reference/`. Task 1 is intentionally separated and should use the Task 1 evaluation code above.
+
+OpenPI source interface:
+
+- Default: use the bundled minimal runtime at `third_party/openpi_minimal`.
+- Optional: point `OPENPI_ROOT` to your own OpenPI checkout. No code changes are needed.
 
 Required local inputs:
 

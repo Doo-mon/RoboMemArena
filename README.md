@@ -110,6 +110,19 @@ The full 26-task benchmark descriptions are available here:
 - [26-Task Reference Evaluation](evaluation_benchmark/reference_evaluation/README.md)
 - [Task Evaluation Code Guide](evaluation_benchmark/docs/task_evaluation_code_guide.md)
 
+## OpenPI Runtime Interface
+
+Evaluation scripts support two OpenPI runtime paths:
+
+- Bundled minimal runtime (default): `third_party/openpi_minimal`
+- External OpenPI source (optional): set `OPENPI_ROOT=/abs/path/to/openpi`
+
+If using external OpenPI source, ensure the following exist:
+
+- `scripts/serve_policy.py`
+- `packages/openpi/src`
+- `packages/openpi-client/src`
+
 ## LIBERO Environment Setup
 
 Evaluation requires a LIBERO-compatible environment. This repo includes a local fork under `evaluation_benchmark/libero_fork/`:
