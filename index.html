@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RoboMemArena: A Comprehensive and Challenging Robotic Memory Benchmark</title>
+    <meta name="description"
+        content="RoboMemArena: a comprehensive and challenging robotic memory benchmark with 26 tasks across four memory-demand categories and keyframe-annotated expert trajectories.">
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Outfit:wght@400;700&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+
+    <header>
+        <div class="container">
+            <h1>RoboMemArena: A Comprehensive and Challenging Robotic Memory Benchmark</h1>
+            <p class="authors">
+                Huashuo Lei<sup>1,*</sup>, Wenxuan Song<sup>1,*,&dagger;</sup>, Huarui Zhang<sup>1</sup>,
+                Jieyuan Pei<sup>5</sup>, Jiayi Chen<sup>1</sup>, Haodong Yan<sup>1</sup>,
+                Han Zhao<sup>2,3</sup>, Pengxiang Ding<sup>2,3</sup>, Zhipeng Zhang<sup>6</sup>,
+                Lida Huang<sup>4</sup>, Donglin Wang<sup>3</sup>, Yan Wang<sup>4</sup>, Haoang Li<sup>1,&#8225;</sup>
+            </p>
+            <p class="affiliations">
+                <sup>1</sup>The Hong Kong University of Science and Technology (Guangzhou), <sup>2</sup>Zhejiang University,
+                <sup>3</sup>Westlake University, <sup>4</sup>Tsinghua University,
+                <sup>5</sup>Zhejiang University of Technology, <sup>6</sup>Shanghai Jiao Tong University
+            </p>
+            <p class="author-notes">
+                <sup>*</sup>Equal Contribution, <sup>&dagger;</sup>Project Lead, <sup>&#8225;</sup>Corresponding Author
+            </p>
+            <div class="resource-links" aria-label="RoboMemArena resources">
+                <a href="https://arxiv.org/abs/2605.10921" class="resource-pill resource-red" target="_blank" rel="noopener noreferrer">
+                    <span class="resource-prefix">arXiv</span>
+                    <span class="resource-value">2605.10921</span>
+                </a>
+                <a href="index.html" class="resource-pill resource-green">
+                    <span class="resource-prefix">Project</span>
+                    <span class="resource-value">Page</span>
+                </a>
+                <a href="https://github.com/OpenHelix-Team/RoboMemArena" class="resource-pill resource-slate" target="_blank" rel="noopener noreferrer">
+                    <span class="resource-prefix">Code</span>
+                    <span class="resource-value">GitHub</span>
+                </a>
+                <a href="leaderboard.html" class="resource-pill resource-indigo">
+                    <span class="resource-prefix">Leaderboard</span>
+                    <span class="resource-value">Results</span>
+                </a>
+                <a href="https://huggingface.co/datasets/RoboMemArenaBenchmark/RoboMemArena" class="resource-pill resource-gold" target="_blank" rel="noopener noreferrer">
+                    <span class="resource-prefix">Dataset</span>
+                    <span class="resource-value">Hugging Face</span>
+                </a>
+                <a href="#bibtex" class="resource-pill resource-blue">
+                    <span class="resource-prefix">Cite</span>
+                    <span class="resource-value">BibTeX</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+
+        <!-- ═══ Benchmark Examples (first) ═══ -->
+        <section id="benchmark">
+            <h2>Benchmark Examples</h2>
+
+            <div class="category">
+                <h3>Sequence</h3>
+                <div class="video-grid">
+                    <div class="video-item">
+                        <video src="videos/task1.mp4" muted loop playsinline></video>
+                        <p>Place cookies &amp; tomato sauce in a container sequentially</p>
+                    </div>
+                    <div class="video-item">
+                        <video src="videos/task2.mp4" muted loop playsinline></video>
+                        <p>Place cream cheese &amp; chocolate pudding in a container sequentially</p>
+                    </div>
+                    <div class="video-item">
+                        <video src="videos/task3.mp4" muted loop playsinline></video>
+                        <p>Pour tomato sauce twice, place cookies into microwave</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="category">
+                <h3>Counting</h3>
+                <div class="video-grid">
+                    <div class="video-item">
+                        <video src="videos/task4.mp4" muted loop playsinline></video>
+                        <p>Pour tomato sauce twice into frypan, place into drainer</p>
+                    </div>
+                    <div class="video-item">
+                        <video src="videos/task5.mp4" muted loop playsinline></video>
+                        <p>Pick chocolate, pour tomato, place into drainer</p>
+                    </div>
+                    <div class="video-item">
+                        <video src="videos/task6.mp4" muted loop playsinline></video>
+                        <p>Pour wine bottle twice into mug</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="category">
+                <h3>Occlusion</h3>
+                <div class="video-grid">
+                    <div class="video-item">
+                        <video src="videos/task7.mp4" muted loop playsinline></video>
+                        <p>Open all drawers sequentially, then place butter into the drawer with an item</p>
+                    </div>
+                    <div class="video-item">
+                        <video src="videos/task8.mp4" muted loop playsinline></video>
+                        <p>Open all drawers sequentially, then place butter into the empty drawer</p>
+                    </div>
+                    <div class="video-item">
+                        <video src="videos/task9.mp4" muted loop playsinline></video>
+                        <p>Place two items into the microwave for heating</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="category">
+                <h3>Transferring</h3>
+                <div class="video-grid">
+                    <div class="video-item">
+                        <video src="videos/task10.mp4" muted loop playsinline></video>
+                        <p>Pick chocolate &amp; butter, cabinet 1 → cabinet 2</p>
+                    </div>
+                    <div class="video-item">
+                        <video src="videos/task11.mp4" muted loop playsinline></video>
+                        <p>Pick tomato, milk &amp; OJ, cabinet 1 → cabinet 2</p>
+                    </div>
+                    <div class="video-item">
+                        <video src="videos/task12.mp4" muted loop playsinline></video>
+                        <p>Pick chocolate &amp; cream, plate 1 → plate 2</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══ Teaser Figure ═══ -->
+        <section id="overview">
+            <h2>Overview</h2>
+            <img src="figures/overview_teaser.png" alt="RoboMemArena Overview" class="teaser-img">
+            <p class="caption"><strong>Figure 1.</strong> RoboMemArena converts natural-language instructions into
+                keyframe-annotated trajectories through VLM-based task decomposition, autonomous execution,
+                closed-loop verification, and targeted human refinement of unsuitable annotations.</p>
+        </section>
+
+        <!-- ═══ Abstract ═══ -->
+        <section id="abstract">
+            <h2>Abstract</h2>
+            <p>
+                Memory is a critical component of robotic intelligence, as robots must rely on past observations and
+                actions to accomplish long-horizon tasks in partially observable environments. However, existing
+                robotic memory benchmarks still lack multimodal annotations for memory formation, provide limited task
+                coverage and structural complexity, and remain restricted to simulation without real-world evaluation.
+                We address this gap with <em>RoboMemArena</em>, a large-scale benchmark of 26 tasks, with average
+                trajectory lengths exceeding 1,000 steps per task and 68.9% of subtasks being memory-dependent. Its
+                generation pipeline uses a vision-language model (VLM) to design and compose subtasks, generates full
+                trajectories through atomic functions, and provides memory-related annotations, including subtask
+                instructions and native keyframe annotations, while paired real-world memory tasks support physical
+                evaluation. We further design <em>PrediMem</em>, a dual-system VLA in which a high-level VLM planner
+                manages a memory bank with recent and keyframe buffers and uses a predictive coding head to improve
+                sensitivity to task dynamics. Extensive experiments on <em>RoboMemArena</em> show that PrediMem
+                outperforms all baselines and provides insights into memory management, model architecture, and scaling
+                laws for complex memory systems.
+            </p>
+        </section>
+
+        <!-- ═══ Method ═══ -->
+        <section id="method">
+            <h2>PrediMem</h2>
+            <p>
+                PrediMem is a dual-system memory framework built around a high-level VLM planner and a low-level VLA
+                executor. The high-level planner receives the current observation together with a memory bank composed
+                of a recent-frame buffer and a keyframe buffer. It predicts the current subtask and decides whether the
+                current frame should be stored as a keyframe, while the low-level policy executes the latest
+                subtask-conditioned action chunk.
+            </p>
+            <p>
+                During training, PrediMem adds a predictive coding head that predicts the next-frame visual latent
+                representation from the current hidden state. This auxiliary objective makes the VLM representation more
+                sensitive to physical state transitions such as grasp closure, object placement, repeated pouring, and
+                drawer closure. The predictive coding head is removed at inference time, so the deployed system keeps
+                the same dual-system architecture and inference cost.
+            </p>
+        </section>
+
+        <!-- ═══ Results ═══ -->
+        <section id="results">
+            <h2>Benchmark Results</h2>
+            <div class="results-content">
+                <div class="results-text">
+                    <p>
+                        RoboMemArena exposes a clear memory gap in existing policies. The reactive
+                        <strong>&pi;<sub>0.5</sub></strong> baseline reaches 21.5&nbsp;% TSR and 38.7&nbsp;% CSR, while
+                        the matched <strong>MemER</strong> implementation improves to 27.3&nbsp;% TSR and 49.1&nbsp;%
+                        CSR. <strong>PrediMem</strong> achieves the best overall simulation performance with
+                        38.5&nbsp;% TSR and 55.2&nbsp;% CSR.
+                    </p>
+                    <p>
+                        Ablations show that both memory components matter. Removing the predictive coding head drops
+                        TSR to 32.3&nbsp;%, while removing the keyframe bank drops TSR to 17.7&nbsp;%. The best
+                        predictive-loss weight is 0.1, and an uncapped keyframe bank performs best for long-horizon
+                        tasks where early observations remain decision-critical.
+                    </p>
+                    <p>
+                        On five real-world memory tasks, PrediMem reaches 52&nbsp;% average success over 10 rollouts per
+                        task, compared with 40&nbsp;% for MemER and 20&nbsp;% for &pi;<sub>0.5</sub>. These results
+                        indicate that keyframe-grounded memory remains useful under physical execution noise.
+                    </p>
+                    <p><a href="leaderboard.html">View the leaderboard page</a> for future submissions and
+                        category-wise metrics.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══ BibTeX ═══ -->
+        <section id="bibtex">
+            <h2>BibTeX</h2>
+            <pre><code>@article{robomemarena2026,
+  title   = {RoboMemArena: A Comprehensive and Challenging
+             Robotic Memory Benchmark},
+  author  = {Huashuo Lei and Wenxuan Song and Huarui Zhang and Jieyuan Pei and Jiayi Chen and Haodong Yan and Han Zhao and Pengxiang Ding and Zhipeng Zhang and Lida Huang and Donglin Wang and Yan Wang and Haoang Li},
+  journal = {arXiv preprint arXiv:2605.10921},
+  year    = {2026}
+}</code></pre>
+        </section>
+
+        <!-- ═══ Benchmark Task Details ═══ -->
+        <section id="task-details">
+            <h2>Benchmark Task Details</h2>
+            <p class="section-intro">
+                Overview of all 26 RoboMemArena tasks, their corresponding memory types, average total timesteps, and
+                key challenges.
+            </p>
+            <div class="task-table-wrapper">
+                <table class="task-table">
+                    <thead>
+                        <tr>
+                            <th>Task Name</th>
+                            <th>Memory Type</th>
+                            <th>Avg. #Steps</th>
+                            <th>Task Challenge</th>
+                            <th>Brief Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="suite-row">
+                            <td colspan="5">Task Suite: Multi-Object Transferring</td>
+                        </tr>
+                        <tr>
+                            <td>Transfer Chocolate Butter</td>
+                            <td class="memory-type">T</td>
+                            <td class="steps">866</td>
+                            <td>transferring</td>
+                            <td>Pick and place chocolate and butter from plate1 to plate2, respectively.</td>
+                        </tr>
+                        <tr>
+                            <td>Transfer Butter Cheese</td>
+                            <td class="memory-type">T</td>
+                            <td class="steps">779</td>
+                            <td>transferring</td>
+                            <td>Pick and place butter and cheese from plate1 to plate2, respectively.</td>
+                        </tr>
+                        <tr>
+                            <td>Transfer Popcorn Cookies</td>
+                            <td class="memory-type">T</td>
+                            <td class="steps">779</td>
+                            <td>transferring</td>
+                            <td>Pick and place popcorn and cookies from plate1 to plate2, respectively.</td>
+                        </tr>
+                        <tr>
+                            <td>Transfer Sauce Milk Juice</td>
+                            <td class="memory-type">T</td>
+                            <td class="steps">1265</td>
+                            <td>transferring</td>
+                            <td>Pick and place tomato sauce, milk, and orange juice from cabinet1 to cabinet2.</td>
+                        </tr>
+
+                        <tr class="suite-row">
+                            <td colspan="5">Task Suite: Multi-Object Occlusion</td>
+                        </tr>
+                        <tr>
+                            <td>Put Butter in Not-Empty Drawer</td>
+                            <td class="memory-type">O</td>
+                            <td class="steps">1020</td>
+                            <td>occlusion</td>
+                            <td>Open all drawers in order. Put butter into the drawer that already contains an object.</td>
+                        </tr>
+                        <tr>
+                            <td>Put Butter in Empty Drawer</td>
+                            <td class="memory-type">O</td>
+                            <td class="steps">1806</td>
+                            <td>occlusion</td>
+                            <td>Open all drawers in order. Put butter into the empty drawer.</td>
+                        </tr>
+                        <tr>
+                            <td>Put Cookies Butter into Drawer Respectively</td>
+                            <td class="memory-type">O + C</td>
+                            <td class="steps">1835</td>
+                            <td>occlusion, multi-placement</td>
+                            <td>Open all drawers in order. Put cookies into the top drawer and put butter into another drawer.</td>
+                        </tr>
+                        <tr>
+                            <td>Put Cookies Chocolate into Middle Drawer</td>
+                            <td class="memory-type">O</td>
+                            <td class="steps">1370</td>
+                            <td>occlusion</td>
+                            <td>Open all drawers in order. Put cookies into the middle drawer and then put chocolate into the same drawer.</td>
+                        </tr>
+                        <tr>
+                            <td>Put Butter Cookies into Middle Drawer</td>
+                            <td class="memory-type">O</td>
+                            <td class="steps">1377</td>
+                            <td>occlusion</td>
+                            <td>Open all drawers in order. Put butter into the middle drawer and then put cookies into the same drawer.</td>
+                        </tr>
+                        <tr>
+                            <td>Put Cookies Chocolate into Drawer Respectively</td>
+                            <td class="memory-type">O</td>
+                            <td class="steps">1832</td>
+                            <td>occlusion, multi-placement</td>
+                            <td>Open all drawers in order. Put cookies into the top drawer and put chocolate into another drawer.</td>
+                        </tr>
+                        <tr>
+                            <td>Put Butter Chocolate into Middle Drawer</td>
+                            <td class="memory-type">O</td>
+                            <td class="steps">1502</td>
+                            <td>occlusion</td>
+                            <td>Open all drawers in order. Put butter into the middle drawer and then put chocolate into the same drawer.</td>
+                        </tr>
+                        <tr>
+                            <td>Put Cookies Chocolate into Microwave</td>
+                            <td class="memory-type">O</td>
+                            <td class="steps">1195</td>
+                            <td>occlusion</td>
+                            <td>Put cookies into the microwave and then put chocolate into the location where the cookies were placed.</td>
+                        </tr>
+                        <tr>
+                            <td>Put Butter Chocolate into Microwave</td>
+                            <td class="memory-type">O</td>
+                            <td class="steps">1175</td>
+                            <td>occlusion</td>
+                            <td>Put butter into the microwave and then put chocolate into the location where the butter was placed.</td>
+                        </tr>
+                        <tr>
+                            <td>Put Cream Popcorn into Microwave</td>
+                            <td class="memory-type">O</td>
+                            <td class="steps">1175</td>
+                            <td>occlusion</td>
+                            <td>Put cream into the microwave and then put popcorn into the location where the cream was placed.</td>
+                        </tr>
+                        <tr>
+                            <td>Put Cookies Popcorn into Microwave</td>
+                            <td class="memory-type">O</td>
+                            <td class="steps">1195</td>
+                            <td>occlusion</td>
+                            <td>Put cookies into the microwave and then put popcorn into the location where the cookies were placed.</td>
+                        </tr>
+
+                        <tr class="suite-row">
+                            <td colspan="5">Task Suite: Multi-Object Counting</td>
+                        </tr>
+                        <tr>
+                            <td>Pour Sauce on Cookies &times;2 Place Sauce into Drainer</td>
+                            <td class="memory-type">C + O</td>
+                            <td class="steps">624</td>
+                            <td>counting, occlusion</td>
+                            <td>Pour tomato sauce over cookies twice and place the sauce bottle into the bowl drainer.</td>
+                        </tr>
+                        <tr>
+                            <td>Pour Sauce on Frypan &times;2 Place Sauce into Drainer</td>
+                            <td class="memory-type">C + O</td>
+                            <td class="steps">537</td>
+                            <td>counting, occlusion</td>
+                            <td>Pour tomato sauce over the frypan twice and place the sauce bottle into the bowl drainer.</td>
+                        </tr>
+                        <tr>
+                            <td>Pour Sauce Twice over Chocolate in Frypan Place Sauce into Drainer</td>
+                            <td class="memory-type">C</td>
+                            <td class="steps">910</td>
+                            <td>counting</td>
+                            <td>Pick and place chocolate into the frypan, pour tomato sauce over it twice, then place the sauce bottle into the bowl drainer.</td>
+                        </tr>
+                        <tr>
+                            <td>Pour Sauce &times;2 over Butter in Frypan</td>
+                            <td class="memory-type">C</td>
+                            <td class="steps">958</td>
+                            <td>counting</td>
+                            <td>Put butter into the frypan and pour sauce over it twice.</td>
+                        </tr>
+                        <tr>
+                            <td>Pour Wine into Mug Twice</td>
+                            <td class="memory-type">C</td>
+                            <td class="steps">472</td>
+                            <td>counting</td>
+                            <td>Pour wine into the mug twice.</td>
+                        </tr>
+                        <tr>
+                            <td>Pour Milk Twice over Butter in Frypan</td>
+                            <td class="memory-type">C</td>
+                            <td class="steps">1055</td>
+                            <td>counting</td>
+                            <td>Pick and place butter into the frypan, then pour milk over it twice.</td>
+                        </tr>
+                        <tr>
+                            <td>Pour Milk &times;2 over Mug Place Milk into Drainer</td>
+                            <td class="memory-type">C + O</td>
+                            <td class="steps">594</td>
+                            <td>counting, occlusion</td>
+                            <td>Pick milk from the table, pour it into the mug twice, then place the milk container into the bowl drainer.</td>
+                        </tr>
+
+                        <tr class="suite-row">
+                            <td colspan="5">Task Suite: Multi-Object Sequence</td>
+                        </tr>
+                        <tr>
+                            <td>Put Cookies Sauce into Basket in Order</td>
+                            <td class="memory-type">S</td>
+                            <td class="steps">742</td>
+                            <td>sequence</td>
+                            <td>Pick and place cookies into the basket, then pick and place tomato sauce into the same basket.</td>
+                        </tr>
+                        <tr>
+                            <td>Put Butter Popcorn into Basket in Order</td>
+                            <td class="memory-type">S</td>
+                            <td class="steps">708</td>
+                            <td>sequence</td>
+                            <td>Pick and place butter into the basket, then pick and place popcorn into the same basket.</td>
+                        </tr>
+                        <tr>
+                            <td>Put Cream Chocolate into Basket in Order</td>
+                            <td class="memory-type">S</td>
+                            <td class="steps">708</td>
+                            <td>sequence</td>
+                            <td>Pick and place cream into the basket, then pick and place chocolate into the same basket.</td>
+                        </tr>
+                        <tr>
+                            <td>Pour Sauce &times;2 Put Cookies into Microwave</td>
+                            <td class="memory-type">S</td>
+                            <td class="steps">1565</td>
+                            <td>sequence</td>
+                            <td>Pour tomato sauce over cookies twice, then put the cookies into the microwave.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+    <footer>
+        <p>&copy; 2025 RoboMemArena &nbsp;·&nbsp; Website adapted from <a
+                href="https://github.com/Diffusion-CoT/reflection2perfection">Academic Project Page Template</a></p>
+    </footer>
+
+    <script>
+        document.querySelectorAll('video').forEach(v => {
+            v.playbackRate = 5;
+            v.parentElement.addEventListener('mouseenter', () => { v.playbackRate = 5; v.play(); });
+            v.parentElement.addEventListener('mouseleave', () => { v.pause(); v.currentTime = 0; });
+        });
+    </script>
+
+</body>
+
+</html>
