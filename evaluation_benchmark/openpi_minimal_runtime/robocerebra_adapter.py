@@ -8,7 +8,8 @@ Matched exactly with DataRecorder logic:
 """
 
 from __future__ import annotations
-from typing import Dict, Any
+from collections import deque
+from typing import Any, Dict
 import numpy as np
 import cv2
 
@@ -67,15 +68,28 @@ def _process_image_match_training(x: np.ndarray, size: int) -> np.ndarray:
     return x
 
 
-def obs_to_pi_element(
-    obs: Dict[str, Any],
-    resize_size: int,
-    prompt: str | None = None,
-) -> Dict[str, Any]:
-    """
-    Build the single policy input element for pi-0.5 server.
-    """
-    # --- 1. 获取图像 ---
+def _extract_state(obs: Dict[str, Any]) -> np.ndarray:
+    eef_pos = obs.get("robot0_eef_pos")
+    eef_quat = obs.get("robot0_eef_quat")
+    gripper = obs.get("robot0_gripper_qpos")
+
+    if eef_pos is None:
+        eef_pos = obs.get("eef_pos") or np.zeros(3, dtype=np.float32)
+    if eef_quat is None:
+        eef_quat = obs.get("eef_quat") or np.array([0, 0, 0, 1], dtype=np.float32)
+    if gripper is None:
+        gripper = obs.get("gripper_qpos") or np.zeros(1, dtype=np.float32)
+
+    return np.concatenate(
+        [
+            np.asarray(eef_pos, dtype=np.float32),
+            _quat2axisangle(np.asarray(eef_quat, dtype=np.float32)),
+            np.asarray(gripper, dtype=np.float32),
+        ]
+    )
+
+
+def _extract_images(obs: Dict[str, Any], resize_size: int) -> tuple[np.ndarray, np.ndarray]:
     img_main = obs.get("agentview_image", None)
     if img_main is None:
         img_main = obs.get("agentview_rgb", None)
@@ -88,30 +102,36 @@ def obs_to_pi_element(
     if img_wrist is None:
         raise KeyError("Neither 'robot0_eye_in_hand_image' nor 'wrist_image' found in obs")
 
-    # --- 2. 获取状态 (Proprio) ---
-    eef_pos = obs.get("robot0_eef_pos")
-    eef_quat = obs.get("robot0_eef_quat")
-    gripper = obs.get("robot0_gripper_qpos")
-
-    # 容错处理
-    if eef_pos is None:
-        eef_pos = obs.get("eef_pos") or np.zeros(3, dtype=np.float32)
-    if eef_quat is None:
-        eef_quat = obs.get("eef_quat") or np.array([0, 0, 0, 1], dtype=np.float32)
-    if gripper is None:
-        gripper = obs.get("gripper_qpos") or np.zeros(1, dtype=np.float32)
-
-    # 拼接状态向量
-    state = np.concatenate(
-        [np.asarray(eef_pos, dtype=np.float32),
-         _quat2axisangle(np.asarray(eef_quat, dtype=np.float32)),
-         np.asarray(gripper, dtype=np.float32)]
-    )
-
-    # --- 3. 处理图像 (使用修正后的函数) ---
-    # 注意：这里不需要传 rotate_180 参数了，因为函数内部已经固定为 flipud
     processed_main = _process_image_match_training(np.asarray(img_main), resize_size)
     processed_wrist = _process_image_match_training(np.asarray(img_wrist), resize_size)
+    return processed_main, processed_wrist
+
+
+def create_history(mem_obs_steps: int) -> dict[str, deque]:
+    return {
+        "state": deque(maxlen=mem_obs_steps),
+        "cam_high": deque(maxlen=mem_obs_steps),
+        "cam_left_wrist": deque(maxlen=mem_obs_steps),
+    }
+
+
+def _pad_sequence(valid: list[np.ndarray], target_len: int, pad_value: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    pad_count = max(0, target_len - len(valid))
+    seq = [pad_value.copy() for _ in range(pad_count)] + [np.asarray(x) for x in valid]
+    mask = np.array([True] * pad_count + [False] * len(valid), dtype=np.bool_)
+    return np.stack(seq, axis=0), mask
+
+
+def obs_to_pi_element(
+    obs: Dict[str, Any],
+    resize_size: int,
+    prompt: str | None = None,
+) -> Dict[str, Any]:
+    """
+    Build the single policy input element for pi-0.5 server.
+    """
+    state = _extract_state(obs)
+    processed_main, processed_wrist = _extract_images(obs, resize_size)
 
     # --- 4. 构造 OpenPI 需要的字典 ---
     # 为了兼容 pi0 模型的 3 个 image slot，我们手动填充
@@ -130,3 +150,40 @@ def obs_to_pi_element(
     }
     
     return element
+
+
+def obs_to_pi_mem_element(
+    obs: Dict[str, Any],
+    history: dict[str, deque],
+    resize_size: int,
+    mem_obs_steps: int,
+    prompt: str | None = None,
+) -> tuple[Dict[str, Any], np.ndarray, np.ndarray]:
+    state = _extract_state(obs)
+    processed_main, processed_wrist = _extract_images(obs, resize_size)
+
+    history["state"].append(state)
+    history["cam_high"].append(processed_main)
+    history["cam_left_wrist"].append(processed_wrist)
+
+    pad_state = np.zeros_like(state)
+    pad_image = np.zeros_like(processed_main)
+
+    state_history, state_is_pad = _pad_sequence(list(history["state"]), mem_obs_steps, pad_state)
+    cam_high_history, cam_high_is_pad = _pad_sequence(list(history["cam_high"]), mem_obs_steps, pad_image)
+    wrist_history, wrist_is_pad = _pad_sequence(list(history["cam_left_wrist"]), mem_obs_steps, pad_image)
+
+    element = {
+        "state_history": state_history,
+        "state_history_is_pad": state_is_pad,
+        "images_history": {
+            "cam_high": cam_high_history,
+            "cam_left_wrist": wrist_history,
+        },
+        "image_history_is_pad": {
+            "cam_high": cam_high_is_pad,
+            "cam_left_wrist": wrist_is_pad,
+        },
+        "prompt": "" if prompt is None else str(prompt),
+    }
+    return element, processed_main, processed_wrist

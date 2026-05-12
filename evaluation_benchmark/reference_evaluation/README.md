@@ -65,7 +65,7 @@ reference_evaluation/
 Required local environment variables:
 
 ```bash
-export OPENPI_ROOT=/abs/path/to/openpi
+export OPENPI_ROOT=/abs/path/to/openpi  # optional; defaults to repo-bundled third_party/openpi_minimal
 export TARGET_LIBERO_PATH=/abs/path/to/LIBERO/libero
 export VLM_CKPT=/abs/path/to/vlm_task1
 ```
@@ -94,7 +94,7 @@ The VLM5 Tasks 2-26 evaluation code currently lives in `tasks2_26_vlm5_reference
 Required local inputs:
 
 ```bash
-export OPENPI_ROOT=/abs/path/to/openpi
+export OPENPI_ROOT=/abs/path/to/openpi  # optional; defaults to repo-bundled third_party/openpi_minimal
 export OPENPI_INFERENCE_ROOT=/abs/path/to/openpi_inference
 export TARGET_LIBERO_PATH=/abs/path/to/LIBERO/libero
 export VLM_CKPT=/abs/path/to/vlm_task1

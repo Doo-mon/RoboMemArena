@@ -32,7 +32,7 @@ async_vlm26_reference/
 Set these paths before running:
 
 ```bash
-export OPENPI_ROOT=/abs/path/to/openpi
+export OPENPI_ROOT=/abs/path/to/openpi  # optional; defaults to repo-bundled third_party/openpi_minimal
 export OPENPI_INFERENCE_ROOT=/abs/path/to/openpi_inference
 export TARGET_LIBERO_PATH=/abs/path/to/LIBERO/libero
 export VLM_CKPT=/abs/path/to/vlm/checkpoint

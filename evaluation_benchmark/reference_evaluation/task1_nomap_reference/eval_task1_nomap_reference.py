@@ -29,13 +29,18 @@ import re
 import websockets.sync.client
 import websockets.exceptions
 
-# This entrypoint lives under openpi_inference on HKUST.
-# Keep openpi read-only and reference its code via explicit paths.
-OPENPI_ROOT = os.environ.get("OPENPI_ROOT", "/data/user/hlei573/openpi")
-DRAWER_DIR = os.path.join(OPENPI_ROOT, "examples", "robocerebra_drawer")
+# Resolve OpenPI runtime root:
+# 1) OPENPI_ROOT (if explicitly provided)
+# 2) repo-bundled minimal runtime under third_party/openpi_minimal
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
+DEFAULT_OPENPI_ROOT = REPO_ROOT / "third_party" / "openpi_minimal"
+OPENPI_ROOT = pathlib.Path(
+    os.environ.get("OPENPI_ROOT", str(DEFAULT_OPENPI_ROOT))
+).resolve()
+DRAWER_DIR = os.path.join(str(OPENPI_ROOT), "examples", "robocerebra_drawer")
 HIGH_QWEN_DIR = os.path.join(DRAWER_DIR, "high_qwen")
-OPENPI_CLIENT_SRC = os.path.join(OPENPI_ROOT, "packages", "openpi-client", "src")
-OPENPI_SRC = os.path.join(OPENPI_ROOT, "packages", "openpi", "src")
+OPENPI_CLIENT_SRC = os.path.join(str(OPENPI_ROOT), "packages", "openpi-client", "src")
+OPENPI_SRC = os.path.join(str(OPENPI_ROOT), "packages", "openpi", "src")
 
 for path in [DRAWER_DIR, HIGH_QWEN_DIR, OPENPI_CLIENT_SRC, OPENPI_SRC]:
     if path not in sys.path:
@@ -53,9 +58,16 @@ from robocerebra_adapter import obs_to_pi_element, _process_image_match_training
 # 1) TARGET_LIBERO_PATH（若设置）优先
 # 2) uv/.venv 默认环境导入
 # 3) 自动回退到 openpi/third_party/libero（避免直接崩溃）
-_libero_path = os.environ.get("TARGET_LIBERO_PATH", "/data/user/hlei573/RoboMemArena_github/LIBERO/libero").strip()
-if _libero_path and os.path.exists(_libero_path) and _libero_path not in sys.path:
-    sys.path.insert(0, _libero_path)
+_libero_path = os.environ.get("TARGET_LIBERO_PATH", "").strip()
+if not _libero_path:
+    _fallback_libero = REPO_ROOT / "evaluation_benchmark" / "libero_fork"
+    if _fallback_libero.exists():
+        _libero_path = str(_fallback_libero)
+if _libero_path and os.path.exists(_libero_path):
+    _libero_path_parent = os.path.dirname(_libero_path.rstrip("/"))
+    for _p in (_libero_path, _libero_path_parent):
+        if _p and _p not in sys.path:
+            sys.path.insert(0, _p)
 
 from libero.libero.envs import OffScreenRenderEnv
 
@@ -116,7 +128,7 @@ SCENE_DESCRIPTION = """Scene description:
 @dataclasses.dataclass
 class Args:
     # ===== 环境 =====
-    bddl_file: str = "/data/user/hlei573/Memory_Execution/case2/task1.bddl"
+    bddl_file: str = "bddl/1_cookies_tomato_basket.bddl"
     # 环境保持 640x480 原始渲染。
     # VLA 侧随后走 obs_to_pi_element -> flipud + resize_size。
     env_img_height: int = 480
@@ -161,8 +173,8 @@ class Args:
     replan_steps: int = 10   # 每次 VLM 输出后，VLA 固定执行 10 步再停下等待
 
     # ===== VLM 模型 =====
-    base_model_dir: str = "/data/user/hlei573/models/Qwen3-VL-8B-Instruct"
-    lora_path: str = "/data/user/hlei573/openpi/output/task1_qwen3_vl_768_hkust_openvit_20260318_010236/v0-20260318-010340/checkpoint-190"
+    base_model_dir: str = "Qwen/Qwen3-VL-8B-Instruct"
+    lora_path: str = "none"
     vlm_device: str = "cuda:1"
     max_new_tokens: int = 512
     vlm_model_type: str = "qwen3_vl"  # 统一使用 Qwen3-VL
@@ -190,7 +202,7 @@ class Args:
     websocket_close_timeout: float = 30.0
 
     # ===== 日志 =====
-    log_base: str = "/data/user/hlei573/openpi_inference/logs_task1_async"
+    log_base: str = "output/task1_sync"
     run_id: str = ""  # 空则自动用时间戳
     video_out_path: str = ""
     task_prompt: str = GLOBAL_PROMPT

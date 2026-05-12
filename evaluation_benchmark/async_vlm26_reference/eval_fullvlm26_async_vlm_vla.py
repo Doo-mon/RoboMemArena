@@ -24,14 +24,21 @@ from transformers import AutoProcessor, Qwen3VLForConditionalGeneration  # noqa:
 
 REFERENCE_DIR = Path(__file__).resolve().parent
 EVAL_BENCHMARK_DIR = REFERENCE_DIR.parent
+REPO_ROOT = EVAL_BENCHMARK_DIR.parent
 RUNTIME_DIR = EVAL_BENCHMARK_DIR / "openpi_minimal_runtime"
-ROOT = Path(os.environ["OPENPI_ROOT"])
-INFERENCE_ROOT = Path(os.environ.get("OPENPI_INFERENCE_ROOT", str(ROOT.parent / "openpi_inference")))
+DEFAULT_OPENPI_ROOT = REPO_ROOT / "third_party" / "openpi_minimal"
+ROOT = Path(os.environ.get("OPENPI_ROOT", str(DEFAULT_OPENPI_ROOT))).resolve()
+_default_inference_root = REPO_ROOT.parent / "openpi_inference"
+if not _default_inference_root.exists():
+    _default_inference_root = REPO_ROOT / "openpi_inference"
+INFERENCE_ROOT = Path(
+    os.environ.get("OPENPI_INFERENCE_ROOT", str(_default_inference_root))
+).resolve()
 OPENPI_CLIENT_SRC = ROOT / "packages" / "openpi-client" / "src"
 OPENPI_SRC = ROOT / "packages" / "openpi" / "src"
 LIBERO_PATH_ENV = os.environ.get("TARGET_LIBERO_PATH", "").strip()
 if not LIBERO_PATH_ENV:
-    _fallback_libero = ROOT / "third_party" / "libero"
+    _fallback_libero = EVAL_BENCHMARK_DIR / "libero_fork" / "libero"
     if _fallback_libero.exists():
         LIBERO_PATH_ENV = str(_fallback_libero)
 LIBERO_PATHS: list[Path] = []

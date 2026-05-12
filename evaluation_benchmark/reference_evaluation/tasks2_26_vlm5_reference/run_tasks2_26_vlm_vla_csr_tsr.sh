@@ -3,8 +3,10 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUNTIME_DIR="$(cd "${SCRIPT_DIR}/../../openpi_minimal_runtime" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+DEFAULT_OPENPI_ROOT="${REPO_ROOT}/third_party/openpi_minimal"
 
-: "${OPENPI_ROOT:?Set OPENPI_ROOT to the OpenPI checkout used for VLM/VLA evaluation.}"
+OPENPI_ROOT=${OPENPI_ROOT:-${DEFAULT_OPENPI_ROOT}}
 : "${OPENPI_INFERENCE_ROOT:?Set OPENPI_INFERENCE_ROOT to the openpi_inference checkout.}"
 : "${TARGET_LIBERO_PATH:?Set TARGET_LIBERO_PATH to the LIBERO/libero package path.}"
 : "${VLM_CKPT:?Set VLM_CKPT to the trained VLM checkpoint directory.}"
@@ -12,6 +14,9 @@ RUNTIME_DIR="$(cd "${SCRIPT_DIR}/../../openpi_minimal_runtime" && pwd)"
 
 VLA_CONFIG=${VLA_CONFIG:-pi05_robomemarena}
 SERVER_PY=${SERVER_PY:-${OPENPI_ROOT}/.venv/bin/python3}
+if [ ! -x "${SERVER_PY}" ]; then
+  SERVER_PY=python3
+fi
 EVAL_PY=${EVAL_PY:-${OPENPI_INFERENCE_ROOT}/.venv/bin/python}
 PORT=${PORT:-8026}
 TS=${TS:-$(date +%Y%m%d_%H%M%S)}
@@ -74,6 +79,10 @@ if [ ! -d "${VLM_CKPT}" ]; then
 fi
 if [ ! -d "${VLA_CKPT}" ]; then
   echo "[ERROR] VLA_CKPT not found: ${VLA_CKPT}" | tee -a "${EVAL_LOG}"
+  exit 1
+fi
+if [ ! -f "${OPENPI_ROOT}/scripts/serve_policy.py" ]; then
+  echo "[ERROR] serve_policy.py not found under OPENPI_ROOT=${OPENPI_ROOT}" | tee -a "${EVAL_LOG}"
   exit 1
 fi
 
