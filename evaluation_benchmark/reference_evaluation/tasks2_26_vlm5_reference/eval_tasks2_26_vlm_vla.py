@@ -447,6 +447,7 @@ def run_episode_async_stateful(
     current_stage_start = 0
     current_subtask_prompt = ""
     goal_success = False
+    ever_goal_success = False
 
     def write_subtask(step_idx: int, subtask: str) -> None:
         with subtask_lock:
@@ -579,8 +580,9 @@ def run_episode_async_stateful(
                 else:
                     goal_success = ec.check_goal_success(env, goal_monitor_dict) if goal_monitor_dict else False
                 if goal_success:
-                    logger.info("[t=%s] goal success", t)
-                    raise StopIteration
+                    if not ever_goal_success:
+                        logger.info("[t=%s] goal success", t)
+                    ever_goal_success = True
                 if done or t >= args.max_steps + args.num_steps_wait:
                     raise StopIteration
     except StopIteration:
@@ -599,12 +601,12 @@ def run_episode_async_stateful(
 
     num_done = sum(1 for ok in stage_done.values() if ok)
     stage_pct = 100.0 * num_done / max(1, len(stage_specs))
-    if not goal_success:
+    if not ever_goal_success:
         if goal_check_override is not None:
-            goal_success = bool(goal_check_override(env, stage_done))
+            ever_goal_success = bool(goal_check_override(env, stage_done))
         else:
-            goal_success = ec.check_goal_success(env, goal_monitor_dict) if goal_monitor_dict else False
-    return stage_pct, stage_done, goal_success, replay, replay_wrist
+            ever_goal_success = ec.check_goal_success(env, goal_monitor_dict) if goal_monitor_dict else False
+    return stage_pct, stage_done, ever_goal_success, replay, replay_wrist
 
 
 def patch_env_resolution() -> None:
@@ -650,7 +652,7 @@ def main() -> None:
     args.vlm_input_profile = os.environ.get("VLM_INPUT_PROFILE", "fullvlm_256")
     args.vlm_match_training_jpeg_roundtrip = os.environ.get("VLM_MATCH_TRAINING_JPEG_ROUNDTRIP", "0") in {"1", "true", "yes"}
     args.vlm_training_jpeg_quality = int(os.environ.get("VLM_TRAINING_JPEG_QUALITY", "30"))
-    args.async_vlm = os.environ.get("ASYNC_VLM", "1") in {"1", "true", "yes"}
+    args.async_vlm = os.environ.get("ASYNC_VLM", "0") in {"1", "true", "yes"}
     args.vlm_interval = int(os.environ.get("VLM_INTERVAL", "5"))
     args.vlm_queue_size = int(os.environ.get("VLM_QUEUE_SIZE", "1"))
     args.n_recent = int(os.environ.get("N_RECENT", "5"))
