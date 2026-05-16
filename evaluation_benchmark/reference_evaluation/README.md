@@ -2,10 +2,7 @@
 
 This folder provides reference VLM/VLA evaluation code for RoboMemArena.
 
-The current released reference is organized as:
-
-- `task1_nomap_reference/`: Task 1 evaluation code.
-- `tasks2_26_vlm5_reference/`: VLM5 Tasks 2-26 evaluation code for the remaining 25 tasks.
+We provide a quick start at `task1_nomap_reference/`. If you want to train/evaluate all tasks, please use `tasks2_26_vlm5_reference/` for VLM5 Tasks 2-26.
 
 The reference evaluation folder is `evaluation_benchmark/reference_evaluation/`.
 Async reference code is kept separately in `evaluation_benchmark/async_vlm26_reference/`.
