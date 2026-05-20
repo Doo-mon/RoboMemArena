@@ -51,6 +51,13 @@ Filename convention for subtask HDF5 files:
 `<primitive>_<subtask_order>_seed<seed>_task<task_id>.hdf5`, where
 `subtask_order` is the 0-based order index used in task decomposition.
 
+The same task seed links multiple subtask files into one complete long-horizon
+trajectory. For example, files with `seed100` under the same task folder should
+be sorted by `subtask_order` and concatenated to reconstruct the full task
+episode. If your training target is the complete task rather than individual
+subtasks, group files by `task_id` and `seed`, then concatenate the ordered
+subtask episodes before training.
+
 ### Key Directories
 
 | Directory | Description |
