@@ -2,14 +2,18 @@
 
 This folder provides reference VLM/VLA evaluation code for RoboMemArena.
 
-We provide a quick start at `task1_nomap_reference/`. If you want to train/evaluate all tasks, please use `tasks2_26_vlm5_reference/` for VLM5 Tasks 2-26.
+For the user-facing full 1-26 task reference runner, use:
+
+```text
+evaluation_benchmark/async_vlm26_reference/
+```
+
+The source tree may keep historical task-specific helper files internally for compatibility with earlier experiments. Users should treat the benchmark as one 1-26 task evaluation setting, not as separate public benchmarks.
 
 The required Python/runtime environment is based on the official OpenPI environment. For the VLM/Qwen3-VL side, use a newer `transformers` environment instead of relying on the original OpenPI venv with `transformers==4.48.1`, which does not provide `Qwen3VLForConditionalGeneration`.
 
-The reference evaluation folder is `evaluation_benchmark/reference_evaluation/`.
-Async reference code is kept separately in `evaluation_benchmark/async_vlm26_reference/`.
-For async evaluation logic reference, see [Async 26-Task Reference Evaluation](../async_vlm26_reference/README.md).
 The model-agnostic benchmark interface remains in `evaluation_benchmark/scripts/`.
+For external model integration, see [Evaluate Your Model on RoboMemArena](../docs/evaluate_your_model.md).
 
 ## Weight Interface (HF-ready)
 
@@ -25,24 +29,17 @@ export VLM_HF_SUBDIR=vlm_task1
 export VLA_HF_SUBDIR=vla_alltask/params
 
 # local resolved paths used by scripts
-export VLM_CKPT=/abs/path/to/vlm_task1
-export VLA_CKPT=/abs/path/to/vla_alltask/params
+export VLM_CKPT=/abs/path/to/vlm_checkpoint
+export VLA_CKPT=/abs/path/to/vla_checkpoint
 ```
 
 For local-only usage:
 
 ```bash
 export WEIGHT_SOURCE=local
-export VLM_CKPT=/abs/path/to/vlm_task1
-export VLA_CKPT=/abs/path/to/vla_alltask/params
+export VLM_CKPT=/abs/path/to/vlm_checkpoint
+export VLA_CKPT=/abs/path/to/vla_checkpoint
 ```
-
-## Weight-to-Code Mapping
-
-| Code path | Weights |
-|---|---|
-| `task1_nomap_reference/eval_task1_nomap_reference.py` | `VLM_HF_SUBDIR=vlm_task1` + `VLA_HF_SUBDIR=vla_alltask/params` |
-| `tasks2_26_vlm5_reference/eval_tasks2_26_vlm_vla.py` | `VLM_HF_SUBDIR=vlm_task1` + `VLA_HF_SUBDIR=vla_alltask/params` |
 
 ## Files
 
@@ -57,47 +54,9 @@ reference_evaluation/
     fullvlm_v2_26_memory_tasks.json
 ```
 
-## Task 1 Evaluation Code
+These files are kept to preserve compatibility with the original reference implementation. For a single 1-26 task command, prefer `evaluation_benchmark/async_vlm26_reference/run_fullvlm26_async_vlm_vla_csr_tsr.sh`.
 
-`task1_nomap_reference/eval_task1_nomap_reference.py` contains the Task 1 evaluation code.
-
-OpenPI source interface:
-
-- Default: use the bundled minimal runtime at `third_party/openpi_minimal`.
-- Optional: use your own OpenPI source tree by setting `OPENPI_ROOT`.
-- Required entries under `OPENPI_ROOT`:
-  - `scripts/serve_policy.py`
-  - `packages/openpi/src`
-  - `packages/openpi-client/src`
-
-Required local environment variables:
-
-```bash
-export OPENPI_ROOT=/abs/path/to/openpi  # optional; defaults to repo-bundled third_party/openpi_minimal
-export TARGET_LIBERO_PATH=/abs/path/to/LIBERO/libero
-export VLM_CKPT=/abs/path/to/vlm_task1
-```
-
-Example:
-
-```bash
-cd evaluation_benchmark/reference_evaluation/task1_nomap_reference
-python eval_task1_nomap_reference.py \
-  --bddl-file ../../bddl/1_cookies_tomato_basket.bddl \
-  --base-model-dir "$VLM_CKPT" \
-  --host 127.0.0.1 \
-  --port 8026 \
-  --resize-size 256 \
-  --num-trials-per-task 1 \
-  --max-steps 2000
-```
-
-The VLA policy server should be launched separately with the all-task VLA
-checkpoint params.
-
-## Tasks 2-26 Evaluation Code
-
-The VLM5 Tasks 2-26 evaluation code currently lives in `tasks2_26_vlm5_reference/`. Task 1 is intentionally separated and should use the Task 1 evaluation code above.
+## 1-26 Reference Runner
 
 OpenPI source interface:
 
@@ -110,25 +69,25 @@ Required local inputs:
 export OPENPI_ROOT=/abs/path/to/openpi  # optional; defaults to repo-bundled third_party/openpi_minimal
 export OPENPI_INFERENCE_ROOT=/abs/path/to/openpi_inference
 export TARGET_LIBERO_PATH=/abs/path/to/LIBERO/libero
-export VLM_CKPT=/abs/path/to/vlm_task1
-export VLA_CKPT=/abs/path/to/vla_alltask/params
+export VLM_CKPT=/abs/path/to/vlm_checkpoint
+export VLA_CKPT=/abs/path/to/vla_checkpoint
 # optional override; default in runner is pi05_robomemarena
 export VLA_CONFIG=<your_vla_config_name>
 ```
 
-Run the default 25-task set:
+Run the full 1-26 task set:
 
 ```bash
-cd evaluation_benchmark/reference_evaluation/tasks2_26_vlm5_reference
-bash run_tasks2_26_vlm_vla_csr_tsr.sh
+cd evaluation_benchmark/async_vlm26_reference
+export TASKS_JSON='[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26]'
+bash run_fullvlm26_async_vlm_vla_csr_tsr.sh
 ```
 
-Run a subset:
+Run a subset for debugging:
 
 ```bash
-cd evaluation_benchmark/reference_evaluation/tasks2_26_vlm5_reference
-export TASKS_JSON='[2,3,4]'
-bash run_tasks2_26_vlm_vla_csr_tsr.sh
+export TASKS_JSON='[1,2,3]'
+bash run_fullvlm26_async_vlm_vla_csr_tsr.sh
 ```
 
 ## Outputs
@@ -146,7 +105,7 @@ ${OUT_ROOT}/task*/ep*/sync_vlm_trace.jsonl
 
 Metric names:
 
-- `CSR`: average stage/process completion percentage
-- `TSR`: final BDDL goal success rate
+- `CSR`: final BDDL goal success rate
+- `TSR`: stage/process completion score
 
 Example HF weight repository: `https://huggingface.co/huashuolei/PrediMem`

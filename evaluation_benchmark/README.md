@@ -6,10 +6,10 @@
 
 ## What this directory contains
 
-This directory contains a model-agnostic evaluation benchmark for RoboMemArena task1..26.
-It is meant for users who already trained their own policy and now want to evaluate it on the benchmark tasks.
+This directory contains a model-agnostic evaluation benchmark for RoboMemArena tasks 1-26.
+It is meant for users who already trained their own policy and now want to evaluate it on the complete benchmark.
 
-This package is organized around a small adapter interface, so users can plug in their own model and evaluate it on the benchmark tasks. The adapter sweep supports Task 1-26. Task 2-26 adapter evaluation uses the same reference stage/goal checker as the VLM/VLA reference path.
+This package is organized around a small adapter interface, so users can plug in their own model and evaluate it on the 1-26 task setting without rewriting the RoboMemArena environment, BDDL loading, rollout loop, video recording, or metric aggregation.
 
 It focuses on:
 
@@ -17,6 +17,7 @@ It focuses on:
 - benchmark task definitions and prompts
 - adapter-based policy integration
 - VLM/VLA reference evaluation code
+- official CSR/TSR reporting for the 1-26 task benchmark
 
 ## Directory layout
 
@@ -30,18 +31,9 @@ evaluation_benchmark/
     policy_adapter.py
     example_policy_adapter_template.py
     eval_common.py
-    eval_task1_only.py
-    eval_tasks2_26.py
-    task2_26_reference_stage.py
     run_all_tasks1_26_until_stage_nonzero.py
   reference_evaluation/
     README.md
-    task1_nomap_reference/
-      eval_task1_nomap_reference.py
-    tasks2_26_vlm5_reference/
-      eval_tasks2_26_vlm_vla.py
-      run_tasks2_26_vlm_vla_csr_tsr.sh
-      fullvlm_v2_26_memory_tasks.json
   async_vlm26_reference/
     README.md
     eval_fullvlm26_async_vlm_vla.py
@@ -51,41 +43,16 @@ evaluation_benchmark/
   libero_fork/
 ```
 
+Some source files keep historical task-specific names for compatibility, but the public benchmark setting is the full 1-26 task evaluation.
+
 ## Quick start
 
 For a focused guide on plugging in your own checkpoint or policy, see [Evaluate Your Model on RoboMemArena](docs/evaluate_your_model.md).
 
-
 1. Make sure your environment can import the local LIBERO fork and its dependencies.
    You typically need a working `mujoco + robosuite + OpenGL/EGL` environment before running actual evaluation.
 2. Implement your own adapter by following `scripts/example_policy_adapter_template.py`.
-3. Run single-task evaluation:
-
-```bash
-cd evaluation_benchmark
-python scripts/eval_task1_only.py \
-  --adapter-spec /abs/path/to/your_adapter.py:build_adapter \
-  --adapter-kwargs '{"checkpoint_dir": "/abs/path/to/ckpt"}' \
-  --video-out-path outputs/task1
-```
-
-By default, `task1` now matches the legacy evaluation path used in our old runs:
-
-- environment render resolution: `640x480`
-- policy resize target: `256`
-
-4. Run task2..26 evaluation:
-
-```bash
-cd evaluation_benchmark
-python scripts/eval_tasks2_26.py \
-  --task-id 4 \
-  --adapter-spec /abs/path/to/your_adapter.py:build_adapter \
-  --adapter-kwargs '{"checkpoint_dir": "/abs/path/to/ckpt"}' \
-  --video-out-path outputs/task4
-```
-
-5. Run the batch sweep until each task from 1 to 26 first reaches `stage > 0`:
+3. Run the 1-26 task sweep:
 
 ```bash
 cd evaluation_benchmark
@@ -94,6 +61,8 @@ python scripts/run_all_tasks1_26_until_stage_nonzero.py \
   --adapter-kwargs '{"checkpoint_dir": "/abs/path/to/ckpt"}' \
   --out-root outputs/tasks1_26_until_stage_nonzero
 ```
+
+The sweep uses the benchmark reference stage/goal checkers, so external model evaluation follows the same 1-26 scoring setting as the reference evaluation path.
 
 ## Adapter contract
 
@@ -112,14 +81,13 @@ See `scripts/policy_adapter.py` and `scripts/example_policy_adapter_template.py`
 If you want to inspect or reuse our VLM/VLA reference evaluation logic, see:
 
 ```text
+evaluation_benchmark/async_vlm26_reference/
 evaluation_benchmark/reference_evaluation/
 ```
 
-That reference evaluation folder contains, in order, the Task 1 evaluation code and the VLM5 Tasks 2-26 evaluation code for the remaining 25 tasks.
-Task 1 is intentionally separated from the Tasks 2-26 runner.
-Async reference code is kept separately in `evaluation_benchmark/async_vlm26_reference/`.
-Users may adjust prompts for their own models, but the rewritten prompts should remain semantically aligned with the official 26-task table and BDDL goals.
-It uses the same metric names as our current reports:
+Use the 26-task reference runner for full benchmark reporting. Internal helper files may keep task-specific names for compatibility with earlier experiments, but users should treat this as one 1-26 benchmark setting.
 
-- `CSR`: average stage/process completion percentage
-- `TSR`: final BDDL goal success rate
+Metric names:
+
+- `CSR`: final BDDL goal success rate
+- `TSR`: stage/process completion score
