@@ -7,16 +7,25 @@
 ## What this directory contains
 
 This directory contains a model-agnostic evaluation benchmark for RoboMemArena tasks 1-26.
-It is meant for users who already trained their own policy and now want to evaluate it on the complete benchmark.
+It is meant for users who already trained their own model and now want to evaluate it on the complete benchmark.
 
-This package is organized around a small adapter interface, so users can plug in their own model and evaluate it on the 1-26 task setting without rewriting the RoboMemArena environment, BDDL loading, rollout loop, video recording, or metric aggregation.
+The public interface is one adapter contract. The benchmark creates the RoboMemArena/LIBERO environment, loads the BDDL task, resets the environment, collects the current observation and task prompt, passes them to the adapter, executes the returned action chunk, records videos, and computes CSR/TSR.
+
+The adapter can wrap any model structure:
+
+- a single policy that maps `obs + prompt` to actions
+- a VLM planner plus a VLA policy
+- a remote policy server
+- a model that needs custom image, state, prompt, or action conversion
+
+The evaluation loop does not need to know which structure is inside the adapter.
 
 It focuses on:
 
 - evaluation entry scripts
 - benchmark task definitions and prompts
-- adapter-based policy integration
-- VLM/VLA reference evaluation code
+- adapter-based model integration
+- reference VLM/VLA integration examples
 - official CSR/TSR reporting for the 1-26 task benchmark
 
 ## Directory layout
@@ -43,11 +52,11 @@ evaluation_benchmark/
   libero_fork/
 ```
 
-Some source files keep historical task-specific names for compatibility, but the public benchmark setting is the full 1-26 task evaluation.
+Some source files keep historical names for compatibility, but the public benchmark setting is the full 1-26 task evaluation.
 
 ## Quick start
 
-For a focused guide on plugging in your own checkpoint or policy, see [Evaluate Your Model on RoboMemArena](docs/evaluate_your_model.md).
+For a focused guide on plugging in your own checkpoint or model, see [Evaluate Your Model on RoboMemArena](docs/evaluate_your_model.md).
 
 1. Make sure your environment can import the local LIBERO fork and its dependencies.
    You typically need a working `mujoco + robosuite + OpenGL/EGL` environment before running actual evaluation.
@@ -76,16 +85,16 @@ Required methods:
 
 See `scripts/policy_adapter.py` and `scripts/example_policy_adapter_template.py`.
 
-## 26-task reference evaluation
+## Reference implementation
 
-If you want to inspect or reuse our VLM/VLA reference evaluation logic, see:
+If you want to inspect how our VLM/VLA stack is connected to the same benchmark setting, see:
 
 ```text
 evaluation_benchmark/async_vlm26_reference/
 evaluation_benchmark/reference_evaluation/
 ```
 
-Use the 26-task reference runner for full benchmark reporting. Internal helper files may keep task-specific names for compatibility with earlier experiments, but users should treat this as one 1-26 benchmark setting.
+These folders are examples of how to connect a planner/policy stack to RoboMemArena. They are not a separate benchmark definition. Internal helper files may keep historical names for compatibility with earlier experiments, but users should treat evaluation as one 1-26 task setting.
 
 Metric names:
 

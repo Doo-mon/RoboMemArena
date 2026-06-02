@@ -1,6 +1,8 @@
 # 26-Task Reference Evaluation
 
-This folder provides reference VLM/VLA evaluation code for RoboMemArena.
+This folder provides reference VLM/VLA integration code for RoboMemArena.
+
+The benchmark should be understood as one 1-26 task evaluation setting. A VLM/VLA system is still an adapter-style model stack: the evaluator creates the environment, loads the BDDL task, obtains the current observation and prompt, calls the planner/policy stack, executes the returned actions, and computes CSR/TSR.
 
 For the user-facing full 1-26 task reference runner, use:
 
@@ -8,11 +10,11 @@ For the user-facing full 1-26 task reference runner, use:
 evaluation_benchmark/async_vlm26_reference/
 ```
 
-The source tree may keep historical task-specific helper files internally for compatibility with earlier experiments. Users should treat the benchmark as one 1-26 task evaluation setting, not as separate public benchmarks.
+The source tree may keep historical helper files internally for compatibility with earlier experiments. Those helper names do not define separate public benchmark modes.
 
 The required Python/runtime environment is based on the official OpenPI environment. For the VLM/Qwen3-VL side, use a newer `transformers` environment instead of relying on the original OpenPI venv with `transformers==4.48.1`, which does not provide `Qwen3VLForConditionalGeneration`.
 
-The model-agnostic benchmark interface remains in `evaluation_benchmark/scripts/`.
+The model-agnostic adapter interface remains in `evaluation_benchmark/scripts/`.
 For external model integration, see [Evaluate Your Model on RoboMemArena](../docs/evaluate_your_model.md).
 
 ## Weight Interface (HF-ready)
@@ -25,8 +27,8 @@ export WEIGHT_SOURCE=hf            # hf or local
 
 # HF repo entry (example)
 export HF_REPO_ID=<your_hf_repo_id>
-export VLM_HF_SUBDIR=vlm_task1
-export VLA_HF_SUBDIR=vla_alltask/params
+export VLM_HF_SUBDIR=<vlm_subdir>
+export VLA_HF_SUBDIR=<vla_subdir>
 
 # local resolved paths used by scripts
 export VLM_CKPT=/abs/path/to/vlm_checkpoint
@@ -46,12 +48,7 @@ export VLA_CKPT=/abs/path/to/vla_checkpoint
 ```text
 reference_evaluation/
   README.md
-  task1_nomap_reference/
-    eval_task1_nomap_reference.py
-  tasks2_26_vlm5_reference/
-    eval_tasks2_26_vlm_vla.py
-    run_tasks2_26_vlm_vla_csr_tsr.sh
-    fullvlm_v2_26_memory_tasks.json
+  legacy reference helper files
 ```
 
 These files are kept to preserve compatibility with the original reference implementation. For a single 1-26 task command, prefer `evaluation_benchmark/async_vlm26_reference/run_fullvlm26_async_vlm_vla_csr_tsr.sh`.

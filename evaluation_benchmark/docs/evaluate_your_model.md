@@ -1,12 +1,20 @@
 # Evaluate Your Model on RoboMemArena
 
-This page explains how to plug your own policy into the RoboMemArena 1-26 task evaluation benchmark.
-The benchmark code handles the RoboMemArena task definitions, BDDL goals, rollouts, videos,
-and CSR/TSR metrics. Your model only needs to provide actions for the current observation and task prompt.
+This page explains the single integration interface for evaluating your model on the RoboMemArena 1-26 task benchmark.
 
-## Option 1: Generic Policy Adapter
+The benchmark code handles the evaluation loop:
 
-Use this path if your model is a single policy that takes an observation and prompt, then outputs an action chunk.
+1. create the RoboMemArena/LIBERO environment
+2. load the task BDDL and task prompt
+3. reset the environment
+4. collect the current observation
+5. pass `obs + prompt` to your adapter
+6. execute the returned action chunk
+7. record videos and compute CSR/TSR
+
+Your model only needs to provide an adapter that returns actions.
+
+## Adapter Interface
 
 Implement the adapter interface in:
 
@@ -21,11 +29,16 @@ def infer_actions(self, obs, prompt, resize_size):
     """Return a numpy action chunk with shape [horizon, action_dim]."""
 ```
 
-The benchmark will call your adapter during rollout. It will create the RoboMemArena/LIBERO environment,
-load the task BDDL, reset the environment, pass the current observation and prompt to your adapter, execute
-the returned actions, save videos, and compute CSR/TSR.
+The adapter can contain any model architecture. For example:
 
-Run the full 1-26 task sweep:
+- a single policy that directly maps `obs + prompt` to an action chunk
+- a VLM planner that chooses a subtask, followed by a VLA policy that outputs actions
+- a policy server client that forwards `obs + prompt` to a remote model
+- custom preprocessing for images, states, prompts, or action dimensions
+
+All of them use the same external contract: `obs + prompt -> action chunk`.
+
+## Run the 1-26 Evaluation
 
 ```bash
 cd evaluation_benchmark
@@ -35,27 +48,28 @@ python scripts/run_all_tasks1_26_until_stage_nonzero.py \
   --out-root outputs/your_model_eval_1_26
 ```
 
-The adapter sweep uses the benchmark reference stage/goal checkers, so the scoring path stays aligned with the 1-26 reference evaluation.
+`--adapter-spec` points to a Python file and factory function:
 
-## Option 2: VLM/VLA Reference Evaluation
+```text
+/abs/path/to/your_adapter.py:build_adapter
+```
 
-Use this path if your system follows the reference VLM planner + VLA policy-server structure.
-For the full 1-26 task reference integration, use:
+The factory should return an object with `reset()` and `infer_actions(obs, prompt, resize_size)`.
+
+## VLM/VLA Models
+
+A VLM/VLA system should still be exposed through the same adapter interface. Inside the adapter, you can run the VLM planner, maintain a subtask buffer, call a VLA policy server, convert observations, and return the final action chunk.
+
+For a reference implementation of that kind of stack, inspect:
 
 ```text
 evaluation_benchmark/async_vlm26_reference/
+evaluation_benchmark/reference_evaluation/
 ```
 
-The source tree may keep task-specific helper files internally for compatibility with earlier experiments, but the user-facing evaluation setting is the complete 1-26 benchmark.
+Those folders show one way to connect a VLM planner and VLA policy to RoboMemArena. They are examples of the same benchmark setting, not a separate scoring definition.
 
-OpenPI source interface:
-
-```text
-Default: use the bundled minimal runtime at third_party/openpi_minimal if available.
-Optional: point OPENPI_ROOT to your own OpenPI checkout. No code changes are needed.
-```
-
-Required local inputs:
+Useful environment variables for the reference VLM/VLA stack include:
 
 ```bash
 export OPENPI_ROOT=/abs/path/to/openpi  # optional if using a bundled minimal OpenPI runtime
@@ -66,19 +80,9 @@ export VLA_CKPT=/abs/path/to/vla_checkpoint
 export VLA_CONFIG=<your_vla_config_name>  # optional; default runner value is pi05_robomemarena
 ```
 
-Run the 1-26 reference runner:
-
-```bash
-cd evaluation_benchmark/async_vlm26_reference
-export TASKS_JSON='[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26]'
-export NUM_TRIALS=1
-bash run_fullvlm26_async_vlm_vla_csr_tsr.sh
-```
-
 ## Metrics
 
 - `CSR`: final BDDL goal success rate.
 - `TSR`: stage/process completion score.
 
-For official reporting, use one evaluation path consistently. The generic adapter path is intended for external
-models. The VLM/VLA reference path is intended for reproducing or adapting the provided reference integration.
+For official reporting, use the same adapter and scoring path consistently across all 1-26 tasks.
