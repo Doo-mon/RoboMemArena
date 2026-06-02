@@ -6,7 +6,10 @@ import json
 import logging
 from pathlib import Path
 
+import numpy as np
+
 import eval_common as ec
+import eval_task1_only as task1_eval
 import eval_tasks2_26 as tasks26
 from policy_adapter import load_policy_adapter
 
@@ -36,10 +39,10 @@ TASK_SUMMARY_HEADER = [
 
 
 def build_argparser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run task2..26 until first non-zero stage score per task.")
+    parser = argparse.ArgumentParser(description="Run task1..26 until first non-zero stage score per task.")
     parser.add_argument("--adapter-spec", required=True)
     parser.add_argument("--adapter-kwargs", default="")
-    parser.add_argument("--task-start", type=int, default=2)
+    parser.add_argument("--task-start", type=int, default=1)
     parser.add_argument("--task-end", type=int, default=26)
     parser.add_argument("--max-steps", type=int, default=3000)
     parser.add_argument("--resize-size", type=int, default=256)
@@ -57,6 +60,45 @@ def _ensure_tsv(path: Path, header: list[str]) -> None:
     with path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="\t")
         writer.writerow(header)
+
+
+def _run_single_task(
+    *,
+    task_id: int,
+    adapter,
+    resize_size: int,
+    replan_steps: int,
+    num_steps_wait: int,
+    max_steps: int,
+    video_dir: Path,
+    seed: int,
+) -> dict:
+    if task_id == 1:
+        return ec.run_eval(
+            task_id=1,
+            num_trials_per_task=1,
+            adapter=adapter,
+            resize_size=resize_size,
+            replan_steps=replan_steps,
+            num_steps_wait=num_steps_wait,
+            max_steps=max_steps,
+            video_out_path=str(video_dir),
+            seed=seed,
+            stage_checks=task1_eval.STAGE_CHECKS,
+            seed_everywhere_fn=lambda s: np.random.seed(s),
+        )
+
+    return tasks26.run_eval_task(
+        task_id=task_id,
+        num_trials_per_task=1,
+        adapter=adapter,
+        resize_size=resize_size,
+        replan_steps=replan_steps,
+        num_steps_wait=num_steps_wait,
+        max_steps=max_steps,
+        video_out_path=str(video_dir),
+        seed=seed,
+    )
 
 
 def main() -> None:
@@ -101,9 +143,8 @@ def main() -> None:
                 video_dir = video_root / f"task{task_id}" / f"attempt_{attempt}_seed_{seed}"
                 video_dir.mkdir(parents=True, exist_ok=True)
 
-                result = tasks26.run_eval_task(
+                result = _run_single_task(
                     task_id=task_id,
-                    num_trials_per_task=1,
                     adapter=adapter,
                     resize_size=args.resize_size,
                     replan_steps=args.replan_steps,

@@ -101,8 +101,13 @@ The full 26-task benchmark descriptions are available here:
 
 - [Benchmark Task Details](https://robomemarena.github.io/#task-details)
 - [Evaluation Benchmark Overview](evaluation_benchmark/README.md)
+- [Evaluate Your Model on RoboMemArena](evaluation_benchmark/docs/evaluate_your_model.md)
 - [26-Task Reference Evaluation](evaluation_benchmark/reference_evaluation/README.md)
 - [Task Evaluation Code Guide](evaluation_benchmark/docs/task_evaluation_code_guide.md)
+
+To evaluate your own model under the official RoboMemArena setting, connect your policy through the generic
+adapter interface, or use the VLM/VLA reference runner if your system follows the reference two-system setup.
+The benchmark provides the RoboMemArena tasks, BDDL goals, rollouts, videos, and CSR/TSR metrics.
 
 ## OpenPI Runtime Interface
 

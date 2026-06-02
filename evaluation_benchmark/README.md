@@ -6,10 +6,10 @@
 
 ## What this directory contains
 
-This directory contains a model-agnostic evaluation benchmark for RoboMemArena task1 and task2..26.
+This directory contains a model-agnostic evaluation benchmark for RoboMemArena task1..26.
 It is meant for users who already trained their own policy and now want to evaluate it on the benchmark tasks.
 
-This package is organized around a small adapter interface, so users can plug in their own model and evaluate it on the benchmark tasks.
+This package is organized around a small adapter interface, so users can plug in their own model and evaluate it on the benchmark tasks. The adapter sweep supports Task 1-26. Task 2-26 adapter evaluation uses the same reference stage/goal checker as the VLM/VLA reference path.
 
 It focuses on:
 
@@ -24,6 +24,7 @@ It focuses on:
 evaluation_benchmark/
   README.md
   docs/
+    evaluate_your_model.md
     task_evaluation_code_guide.md
   scripts/
     policy_adapter.py
@@ -31,6 +32,7 @@ evaluation_benchmark/
     eval_common.py
     eval_task1_only.py
     eval_tasks2_26.py
+    task2_26_reference_stage.py
     run_all_tasks1_26_until_stage_nonzero.py
   reference_evaluation/
     README.md
@@ -50,6 +52,9 @@ evaluation_benchmark/
 ```
 
 ## Quick start
+
+For a focused guide on plugging in your own checkpoint or policy, see [Evaluate Your Model on RoboMemArena](docs/evaluate_your_model.md).
+
 
 1. Make sure your environment can import the local LIBERO fork and its dependencies.
    You typically need a working `mujoco + robosuite + OpenGL/EGL` environment before running actual evaluation.
@@ -80,14 +85,14 @@ python scripts/eval_tasks2_26.py \
   --video-out-path outputs/task4
 ```
 
-5. Run the batch sweep until each task from 2 to 26 first reaches `stage > 0`:
+5. Run the batch sweep until each task from 1 to 26 first reaches `stage > 0`:
 
 ```bash
 cd evaluation_benchmark
 python scripts/run_all_tasks1_26_until_stage_nonzero.py \
   --adapter-spec /abs/path/to/your_adapter.py:build_adapter \
   --adapter-kwargs '{"checkpoint_dir": "/abs/path/to/ckpt"}' \
-  --out-root outputs/tasks2_26_until_stage_nonzero
+  --out-root outputs/tasks1_26_until_stage_nonzero
 ```
 
 ## Adapter contract

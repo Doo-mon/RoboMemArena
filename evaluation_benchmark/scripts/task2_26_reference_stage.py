@@ -1,29 +1,34 @@
 from __future__ import annotations
 
-import argparse
-import dataclasses
-import logging
-from collections import deque
-from pathlib import Path
+from dataclasses import dataclass
 from typing import Any, Callable
 
-import imageio
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
 import eval_common as ec
-from policy_adapter import BasePolicyAdapter, ensure_action_chunk, load_policy_adapter
 
 
-@dataclasses.dataclass
+# Shared Task2-26 stage/goal checker used by both the adapter benchmark
+# and the VLM/VLA reference path. Keep this in sync with
+# evaluation_benchmark/openpi_minimal_runtime/retry_tasks2_26_stage_from_anygrasp.py.
+
+@dataclass
 class StageSpec:
     name: str
     check_fn: Callable[[Any, dict[str, Any], int], bool]
 
-
 def _patch_env_resolution() -> None:
-    ec.patch_env_resolution(480, 640)
+    base_env = ec._get_env_class()
+    orig_init = base_env.__init__
 
+    def patched_init(self, *args, **kwargs):
+        kwargs["camera_heights"] = 480
+        kwargs["camera_widths"] = 640
+        return orig_init(self, *args, **kwargs)
+
+    base_env.__init__ = patched_init
+    ec._get_env_class = lambda: base_env
 
 def _name_variants(name: str) -> list[str]:
     out = [name]
@@ -33,10 +38,8 @@ def _name_variants(name: str) -> list[str]:
         out.append(name[:-5])
     return out
 
-
 def _current_body_pos(env: Any, name: str) -> np.ndarray | None:
     return ec._body_pos(env, name)
-
 
 def _current_site_pos(env: Any, name: str) -> np.ndarray | None:
     for cand in _name_variants(name):
@@ -47,13 +50,11 @@ def _current_site_pos(env: Any, name: str) -> np.ndarray | None:
             continue
     return None
 
-
 def _initial_body_pos(state: dict[str, Any], name: str) -> np.ndarray | None:
     for cand in _name_variants(name):
         if cand in state["initial_body_pos"]:
             return state["initial_body_pos"][cand]
     return None
-
 
 def _initial_site_pos(state: dict[str, Any], name: str) -> np.ndarray | None:
     for cand in _name_variants(name):
@@ -61,10 +62,21 @@ def _initial_site_pos(state: dict[str, Any], name: str) -> np.ndarray | None:
             return state["initial_site_pos"][cand]
     return None
 
+def _body_geom_center(env: Any, body_name: str) -> np.ndarray | None:
+    bid = ec._resolve_body_id(env, body_name)
+    if bid is None:
+        return None
+    geom_start = int(env.sim.model.body_geomadr[bid])
+    geom_num = int(env.sim.model.body_geomnum[bid])
+    if geom_num <= 0:
+        return _current_body_pos(env, body_name)
+    acc = np.zeros(3, dtype=np.float32)
+    for i in range(geom_num):
+        acc += np.asarray(env.sim.data.geom_xpos[geom_start + i], dtype=np.float32)
+    return acc / float(geom_num)
 
 def _drawer_handle_pos(env: Any, drawer: str) -> np.ndarray | None:
     return _current_body_pos(env, f"wooden_cabinet_1_{drawer}_handle")
-
 
 def _microwave_anchor_pose(env: Any) -> tuple[np.ndarray, np.ndarray] | tuple[None, None]:
     site_names = [str(x) for x in env.sim.model.site_names]
@@ -81,7 +93,6 @@ def _microwave_anchor_pose(env: Any) -> tuple[np.ndarray, np.ndarray] | tuple[No
     mat = np.asarray(env.sim.data.body_xmat[bid], dtype=np.float32).reshape(3, 3).copy()
     return pos, mat
 
-
 def _calc_microwave_handle_pos(env: Any) -> np.ndarray | None:
     site_pos, site_mat = _microwave_anchor_pose(env)
     if site_pos is None or site_mat is None:
@@ -93,7 +104,6 @@ def _calc_microwave_handle_pos(env: Any) -> np.ndarray | None:
     handle_pos += front_dir * 0.05
     handle_pos[2] += 0.03
     return handle_pos.astype(np.float32)
-
 
 def _microwave_joint_angle(env: Any) -> float | None:
     candidates = [
@@ -116,11 +126,9 @@ def _microwave_joint_angle(env: Any) -> float | None:
             return float(env.sim.data.qpos[adr])
     return None
 
-
 def _tilt_from_quat(quat: np.ndarray) -> float:
     z_axis = R.from_quat(np.asarray(quat, dtype=np.float64)).as_matrix()[:, 2]
     return float(np.arccos(np.clip(z_axis[2], -1.0, 1.0)))
-
 
 def _build_initial_state(env: Any) -> dict[str, Any]:
     body_names = [str(x) for x in env.sim.model.body_names]
@@ -151,7 +159,6 @@ def _build_initial_state(env: Any) -> dict[str, Any]:
         "last_obs": None,
     }
 
-
 def _update_state(obs: Any, state: dict[str, Any]) -> None:
     quat = None
     if isinstance(obs, dict):
@@ -161,15 +168,49 @@ def _update_state(obs: Any, state: dict[str, Any]) -> None:
         state["step_idx"] = len(state["tilt_angles"])
     state["last_obs"] = obs
 
-
 def _segment_tilts(state: dict[str, Any], stage_start: int) -> np.ndarray:
     vals = state["tilt_angles"][stage_start:]
     if not vals:
         return np.zeros((0,), dtype=np.float32)
     return np.asarray(vals, dtype=np.float32)
 
+def _lift_abs(obj_name: str, z_thresh: float) -> Callable[[Any, dict[str, Any], int], bool]:
+    def check(env: Any, state: dict[str, Any], stage_start: int) -> bool:
+        pos = _current_body_pos(env, obj_name)
+        return pos is not None and float(pos[2]) > z_thresh
 
-def _in_container_body(obj_name: str, target_name: str, xy_thresh: float, z_low: float, z_high: float):
+    return check
+
+def _lift_rel(
+    obj_name: str,
+    delta: float,
+    plate1_max_rise: float | None = None,
+) -> Callable[[Any, dict[str, Any], int], bool]:
+    def check(env: Any, state: dict[str, Any], stage_start: int) -> bool:
+        pos = _current_body_pos(env, obj_name)
+        init_pos = _initial_body_pos(state, obj_name)
+        if pos is None or init_pos is None:
+            return False
+        if float(pos[2] - init_pos[2]) <= delta:
+            return False
+        if plate1_max_rise is not None:
+            plate_pos = _current_body_pos(env, "plate_1")
+            plate_init = _initial_body_pos(state, "plate_1")
+            if plate_pos is None or plate_init is None:
+                return False
+            if float(plate_pos[2] - plate_init[2]) > plate1_max_rise:
+                return False
+        return True
+
+    return check
+
+def _in_container_body(
+    obj_name: str,
+    target_name: str,
+    xy_thresh: float,
+    z_low: float,
+    z_high: float,
+) -> Callable[[Any, dict[str, Any], int], bool]:
     def check(env: Any, state: dict[str, Any], stage_start: int) -> bool:
         obj_pos = _current_body_pos(env, obj_name)
         tgt_pos = _current_body_pos(env, target_name)
@@ -181,8 +222,14 @@ def _in_container_body(obj_name: str, target_name: str, xy_thresh: float, z_low:
 
     return check
 
-
-def _in_container_site(obj_name: str, site_name: str, x_thresh: float, y_thresh: float, z_low: float, z_high: float):
+def _in_container_site(
+    obj_name: str,
+    site_name: str,
+    x_thresh: float,
+    y_thresh: float,
+    z_low: float,
+    z_high: float,
+) -> Callable[[Any, dict[str, Any], int], bool]:
     def check(env: Any, state: dict[str, Any], stage_start: int) -> bool:
         obj_pos = _current_body_pos(env, obj_name)
         site_pos = _current_site_pos(env, site_name)
@@ -195,8 +242,12 @@ def _in_container_site(obj_name: str, site_name: str, x_thresh: float, y_thresh:
 
     return check
 
-
-def _in_drawer_radius(obj_name: str, region_name: str, horizontal_thresh: float, z_thresh: float):
+def _in_drawer_radius(
+    obj_name: str,
+    region_name: str,
+    horizontal_thresh: float,
+    z_thresh: float,
+) -> Callable[[Any, dict[str, Any], int], bool]:
     def check(env: Any, state: dict[str, Any], stage_start: int) -> bool:
         obj_pos = _current_body_pos(env, obj_name)
         region_pos = _current_site_pos(env, region_name)
@@ -208,8 +259,14 @@ def _in_drawer_radius(obj_name: str, region_name: str, horizontal_thresh: float,
 
     return check
 
-
-def _in_drawer_y_window(obj_name: str, region_name: str, x_thresh: float, y_low_offset: float, y_high_offset: float, z_thresh: float):
+def _in_drawer_y_window(
+    obj_name: str,
+    region_name: str,
+    x_thresh: float,
+    y_low_offset: float,
+    y_high_offset: float,
+    z_thresh: float,
+) -> Callable[[Any, dict[str, Any], int], bool]:
     def check(env: Any, state: dict[str, Any], stage_start: int) -> bool:
         obj_pos = _current_body_pos(env, obj_name)
         region_pos = _current_site_pos(env, region_name)
@@ -222,8 +279,63 @@ def _in_drawer_y_window(obj_name: str, region_name: str, x_thresh: float, y_low_
 
     return check
 
+def _drawer_open_handle(drawer: str, threshold: float) -> Callable[[Any, dict[str, Any], int], bool]:
+    handle_name = f"wooden_cabinet_1_{drawer}_handle"
 
-def _drawer_open_abs(region_name: str, initial_y: float | None, threshold: float):
+    def check(env: Any, state: dict[str, Any], stage_start: int) -> bool:
+        cur = _drawer_handle_pos(env, drawer)
+        init = _initial_body_pos(state, handle_name)
+        if cur is None or init is None:
+            return False
+        return float(np.linalg.norm(cur - init)) >= threshold
+
+    return check
+
+def _drawer_closed_handle(drawer: str, threshold: float) -> Callable[[Any, dict[str, Any], int], bool]:
+    handle_name = f"wooden_cabinet_1_{drawer}_handle"
+
+    def check(env: Any, state: dict[str, Any], stage_start: int) -> bool:
+        cur = _drawer_handle_pos(env, drawer)
+        init = _initial_body_pos(state, handle_name)
+        if cur is None or init is None:
+            return False
+        return float(np.linalg.norm(cur - init)) <= threshold
+
+    return check
+
+def _drawer_open_pull(
+    region_name: str,
+    closed_y: float,
+    threshold: float,
+) -> Callable[[Any, dict[str, Any], int], bool]:
+    def check(env: Any, state: dict[str, Any], stage_start: int) -> bool:
+        region_pos = _current_site_pos(env, region_name)
+        if region_pos is None:
+            return False
+        pull_distance = closed_y - float(region_pos[1])
+        return pull_distance > threshold
+
+    return check
+
+def _drawer_closed_pull(
+    region_name: str,
+    closed_y: float,
+    threshold: float,
+) -> Callable[[Any, dict[str, Any], int], bool]:
+    def check(env: Any, state: dict[str, Any], stage_start: int) -> bool:
+        region_pos = _current_site_pos(env, region_name)
+        if region_pos is None:
+            return False
+        pull_distance = closed_y - float(region_pos[1])
+        return pull_distance < threshold
+
+    return check
+
+def _drawer_open_abs(
+    region_name: str,
+    initial_y: float | None,
+    threshold: float,
+) -> Callable[[Any, dict[str, Any], int], bool]:
     def check(env: Any, state: dict[str, Any], stage_start: int) -> bool:
         region_pos = _current_site_pos(env, region_name)
         init_pos = _initial_site_pos(state, region_name)
@@ -239,8 +351,11 @@ def _drawer_open_abs(region_name: str, initial_y: float | None, threshold: float
 
     return check
 
-
-def _drawer_closed_abs(region_name: str, initial_y: float | None, threshold: float):
+def _drawer_closed_abs(
+    region_name: str,
+    initial_y: float | None,
+    threshold: float,
+) -> Callable[[Any, dict[str, Any], int], bool]:
     def check(env: Any, state: dict[str, Any], stage_start: int) -> bool:
         region_pos = _current_site_pos(env, region_name)
         init_pos = _initial_site_pos(state, region_name)
@@ -256,8 +371,10 @@ def _drawer_closed_abs(region_name: str, initial_y: float | None, threshold: flo
 
     return check
 
-
-def _microwave_open(joint_thresh: float, fallback_x_thresh: float = 0.65):
+def _microwave_open(
+    joint_thresh: float,
+    fallback_x_thresh: float = 0.65,
+) -> Callable[[Any, dict[str, Any], int], bool]:
     def check(env: Any, state: dict[str, Any], stage_start: int) -> bool:
         angle = _microwave_joint_angle(env)
         if angle is not None:
@@ -269,8 +386,7 @@ def _microwave_open(joint_thresh: float, fallback_x_thresh: float = 0.65):
 
     return check
 
-
-def _microwave_closed(dist_thresh: float = 0.05):
+def _microwave_closed(dist_thresh: float = 0.05) -> Callable[[Any, dict[str, Any], int], bool]:
     def check(env: Any, state: dict[str, Any], stage_start: int) -> bool:
         cur = _calc_microwave_handle_pos(env)
         init = state.get("initial_microwave_handle_pos")
@@ -283,20 +399,16 @@ def _microwave_closed(dist_thresh: float = 0.05):
 
     return check
 
-
-def _in_microwave(obj_name: str, xy_thresh: float = 0.20):
+def _in_microwave(obj_name: str, xy_thresh: float = 0.20) -> Callable[[Any, dict[str, Any], int], bool]:
     return _in_container_site(obj_name, "microwave_1_heating_region", xy_thresh, xy_thresh, -1.0, 1.0)
 
-
-def _cabinet2(obj_name: str, xy_thresh: float, z_low: float, z_high: float):
+def _cabinet2(obj_name: str, xy_thresh: float, z_low: float, z_high: float) -> Callable[[Any, dict[str, Any], int], bool]:
     return _in_container_body(obj_name, "wooden_cabinet_2", xy_thresh, z_low, z_high)
 
-
-def _on_plate(obj_name: str, plate_name: str = "plate_2"):
+def _on_plate(obj_name: str, plate_name: str = "plate_2") -> Callable[[Any, dict[str, Any], int], bool]:
     return _in_container_body(obj_name, plate_name, 0.06, 0.01, 0.10)
 
-
-def _table_return(obj_name: str, radius: float):
+def _table_return(obj_name: str, radius: float) -> Callable[[Any, dict[str, Any], int], bool]:
     def check(env: Any, state: dict[str, Any], stage_start: int) -> bool:
         cur = _current_body_pos(env, obj_name)
         init = _initial_body_pos(state, obj_name)
@@ -307,8 +419,12 @@ def _table_return(obj_name: str, radius: float):
 
     return check
 
-
-def _near_fixed_position(obj_name: str, target: np.ndarray, xy_thresh: float, z_thresh: float):
+def _near_fixed_position(
+    obj_name: str,
+    target: np.ndarray,
+    xy_thresh: float,
+    z_thresh: float,
+) -> Callable[[Any, dict[str, Any], int], bool]:
     def check(env: Any, state: dict[str, Any], stage_start: int) -> bool:
         cur = _current_body_pos(env, obj_name)
         if cur is None:
@@ -319,8 +435,12 @@ def _near_fixed_position(obj_name: str, target: np.ndarray, xy_thresh: float, z_
 
     return check
 
-
-def _pour_stage(range_thresh: float, min_steps: int, hold_angle: float | None = None, hold_frames: int | None = None):
+def _pour_stage(
+    range_thresh: float,
+    min_steps: int,
+    hold_angle: float | None = None,
+    hold_frames: int | None = None,
+) -> Callable[[Any, dict[str, Any], int], bool]:
     def check(env: Any, state: dict[str, Any], stage_start: int) -> bool:
         tilts = _segment_tilts(state, stage_start)
         if len(tilts) < min_steps:
@@ -334,12 +454,11 @@ def _pour_stage(range_thresh: float, min_steps: int, hold_angle: float | None = 
 
     return check
 
-
 def _task_specs(task_id: int) -> list[StageSpec]:
     if task_id == 2:
         return [
-            StageSpec("01_Place_Cream_Basket", _in_container_body("cream_cheese_1", "basket_1", 0.12, -0.05, 0.20)),
-            StageSpec("02_Place_Pudding_Basket", _in_container_body("chocolate_pudding_1", "basket_1", 0.12, -0.05, 0.20)),
+            StageSpec("01_Place_Butter_Basket", _in_container_body("butter_1", "basket_1", 0.12, -0.05, 0.20)),
+            StageSpec("02_Place_Popcorn_Basket", _in_container_body("popcorn_1", "basket_1", 0.12, -0.05, 0.20)),
         ]
     if task_id == 3:
         return [
@@ -514,256 +633,16 @@ def _task_specs(task_id: int) -> list[StageSpec]:
         ]
     raise ValueError(f"Unsupported task_id={task_id}")
 
-
-def _goal_override_check(task_id: int) -> Callable[[Any], bool] | None:
-    if task_id == 6:
+def _goal_override_check(task_id: int) -> Callable[[Any, dict[str, bool]], bool] | None:
+    if task_id in {10, 15, 18, 19}:
+        #  goal 
+        return lambda env, stage_done: all(stage_done.values())
+    if task_id in {6, 7, 8, 9}:
+        # Tomato tasks: goal is placing tomato sauce in bowl drainer.
         place_bowl_drainer = _in_container_body("tomato_sauce_1", "bowl_drainer_1", 0.15, -0.05, 0.20)
-        return lambda env: place_bowl_drainer(env, {}, 0)
+        return lambda env, stage_done: place_bowl_drainer(env, {}, 0)
+    if task_id == 16:
+        # Milk task: goal must track milk_1, not tomato_sauce_1.
+        place_bowl_drainer = _in_container_body("milk_1", "bowl_drainer_1", 0.15, -0.05, 0.20)
+        return lambda env, stage_done: place_bowl_drainer(env, {}, 0)
     return None
-
-
-def run_episode_with_stateful_stages(
-    env: Any,
-    adapter: BasePolicyAdapter,
-    prompt: str,
-    resize_size: int,
-    replan_steps: int,
-    num_steps_wait: int,
-    max_steps: int,
-    stage_specs: list[StageSpec],
-    goal_monitor_dict: dict[str, list[tuple[str, str]]],
-    goal_check_override: Callable[[Any], bool] | None,
-) -> tuple[float, dict[str, bool], bool, list[np.ndarray], list[np.ndarray]]:
-    obs = env.reset()
-    replay: list[np.ndarray] = []
-    replay_wrist: list[np.ndarray] = []
-    action_plan: deque[np.ndarray] = deque()
-    stage_done = {spec.name: False for spec in stage_specs}
-    stage_idx = 0
-    t = 0
-    state: dict[str, Any] | None = None
-    current_stage_start = 0
-
-    try:
-        while t < max_steps + num_steps_wait:
-            if t < num_steps_wait:
-                obs, _, _, _ = env.step(ec.LIBERO_DUMMY_ACTION)
-                t += 1
-                continue
-
-            if state is None:
-                state = _build_initial_state(env)
-                current_stage_start = state["step_idx"]
-
-            img = obs.get("agentview_image") or obs.get("agentview_rgb")
-            wrist = obs.get("robot0_eye_in_hand_image") or obs.get("wrist_image")
-            if img is not None:
-                replay.append(np.asarray(img))
-            if wrist is not None:
-                replay_wrist.append(np.asarray(wrist))
-
-            if not action_plan:
-                actions = ensure_action_chunk(adapter.infer_actions(obs=obs, prompt=prompt, resize_size=resize_size))
-                action_plan.extend(actions[:replan_steps])
-
-            action = action_plan.popleft()
-            obs, _, done, _ = env.step(action.tolist())
-            _update_state(obs, state)
-
-            if stage_idx < len(stage_specs):
-                spec = stage_specs[stage_idx]
-                if spec.check_fn(env, state, current_stage_start):
-                    stage_done[spec.name] = True
-                    logging.info(f"  [t={t}] Stage completed: {spec.name}")
-                    stage_idx += 1
-                    current_stage_start = state["step_idx"]
-
-            if stage_idx >= len(stage_specs):
-                logging.info(f"  [t={t}] All stages completed.")
-                break
-            if done:
-                break
-            t += 1
-    except Exception as exc:
-        logging.exception(f"Episode failed: {exc}")
-
-    num_done = sum(1 for ok in stage_done.values() if ok)
-    score = 100.0 * num_done / max(1, len(stage_specs))
-    if goal_check_override is not None:
-        goal_success = goal_check_override(env)
-    else:
-        goal_success = ec.check_goal_success(env, goal_monitor_dict) if goal_monitor_dict else False
-    return score, stage_done, goal_success, replay, replay_wrist
-
-
-# Use the same Task2-26 stage/goal checker as the VLM/VLA reference
-# evaluation path, while preserving the generic adapter interface.
-from task2_26_reference_stage import (  # noqa: E402
-    StageSpec,
-    _build_initial_state,
-    _goal_override_check,
-    _patch_env_resolution,
-    _task_specs,
-    _update_state,
-)
-
-
-def run_eval_task(
-    task_id: int,
-    num_trials_per_task: int,
-    resize_size: int,
-    replan_steps: int,
-    num_steps_wait: int,
-    max_steps: int,
-    video_out_path: str,
-    seed: int,
-    adapter: BasePolicyAdapter | None = None,
-    adapter_spec: str | None = None,
-    adapter_kwargs: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    if task_id == 1:
-        raise ValueError("Task 1 is intentionally excluded from eval_tasks2_26.py. Use eval_task1_only.py or reference_evaluation/task1_nomap_reference/eval_task1_nomap_reference.py.")
-
-    if adapter is None:
-        adapter = load_policy_adapter(adapter_spec or "", **(adapter_kwargs or {}))
-        owns_adapter = True
-    else:
-        owns_adapter = False
-
-    tid, task_key = ec._resolve_task_id(task_id)
-    bddl_path = ec._resolve_bddl_path(task_id)
-    prompt = ec.get_prompt(task_key, bddl_path.stem)
-    video_dir = Path(video_out_path)
-    video_dir.mkdir(parents=True, exist_ok=True)
-
-    logging.info(f"Using BDDL: {bddl_path}")
-    logging.info(f"Prompt: {prompt}")
-    logging.info(f"Video output: {video_dir}")
-
-    OffScreenRenderEnv = ec._get_env_class()
-    env = OffScreenRenderEnv(
-        bddl_file_name=str(bddl_path),
-        camera_heights=256,
-        camera_widths=256,
-        ignore_done=True,
-        reward_shaping=True,
-        control_freq=20,
-        initialization_noise=None,
-    )
-
-    stage_specs = _task_specs(task_id)
-    goal_monitor_dict = ec._build_goal_monitor_dict(bddl_path)
-    goal_check_override = _goal_override_check(task_id)
-
-    total_score = 0.0
-    stage_totals = {spec.name: 0 for spec in stage_specs}
-    goal_succ_cnt = 0
-    episodes: list[dict[str, Any]] = []
-
-    try:
-        for ep in range(num_trials_per_task):
-            current_seed = seed + ep
-            np.random.seed(current_seed)
-            try:
-                env.seed(current_seed)
-            except AttributeError:
-                pass
-            adapter.reset()
-
-            score, stage_done, goal_success, replay, replay_wrist = run_episode_with_stateful_stages(
-                env=env,
-                adapter=adapter,
-                prompt=prompt,
-                resize_size=resize_size,
-                replan_steps=replan_steps,
-                num_steps_wait=num_steps_wait,
-                max_steps=max_steps,
-                stage_specs=stage_specs,
-                goal_monitor_dict=goal_monitor_dict,
-                goal_check_override=goal_check_override,
-            )
-            total_score += score
-            for name, ok in stage_done.items():
-                stage_totals[name] += int(ok)
-            goal_succ_cnt += int(goal_success)
-
-            base_name = ec.get_video_basename(task_id, ep, current_seed, goal_success)
-            if replay:
-                imageio.mimwrite(video_dir / f"{base_name}.mp4", replay, fps=10)
-            if replay_wrist:
-                imageio.mimwrite(video_dir / f"{base_name}_wrist.mp4", replay_wrist, fps=10)
-
-            stages_str = " | ".join(f"{n}={'Y' if stage_done[n] else 'N'}" for n in stage_done)
-            logging.info(
-                f"Episode {ep} (seed={current_seed}): score={score:.0f}% | {stages_str} | goal={'Y' if goal_success else 'N'}"
-            )
-            episodes.append(
-                {
-                    "ep": ep,
-                    "seed": current_seed,
-                    "score_pct": float(score),
-                    "goal_success": bool(goal_success),
-                    "stage_done": stage_done,
-                }
-            )
-    finally:
-        env.close()
-        if owns_adapter:
-            close_fn = getattr(adapter, "close", None)
-            if callable(close_fn):
-                close_fn()
-
-    n = num_trials_per_task
-    avg_score = total_score / max(1, n)
-    logging.info("============================================================")
-    logging.info(f"Final result - average stage success rate = {avg_score:.1f}%")
-    for name, cnt in stage_totals.items():
-        logging.info(f"  {name}: {cnt}/{n} ({(cnt / max(1, n)) * 100:.0f}%)")
-    goal_pct = 100.0 * goal_succ_cnt / max(1, n)
-    logging.info(f"Final result - BDDL goal success rate: {goal_succ_cnt}/{n} ({goal_pct:.1f}%)")
-    logging.info(f"Video output: {video_dir}")
-    logging.info("============================================================")
-
-    return {
-        "task_id": tid if tid is not None else task_id,
-        "task_key": task_key,
-        "prompt": prompt,
-        "bddl_path": str(bddl_path),
-        "video_dir": str(video_dir),
-        "average_score_pct": float(avg_score),
-        "goal_success_rate_pct": float(goal_pct),
-        "episodes": episodes,
-    }
-
-
-def build_argparser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Evaluate one RoboMemArena task from task2..26 with a custom policy adapter.")
-    parser.add_argument("--task-id", type=int, required=True)
-    parser.add_argument("--adapter-spec", required=True)
-    parser.add_argument("--adapter-kwargs", default="")
-    parser.add_argument("--resize-size", type=int, default=256)
-    parser.add_argument("--replan-steps", type=int, default=5)
-    parser.add_argument("--num-steps-wait", type=int, default=10)
-    parser.add_argument("--num-trials-per-task", type=int, default=1)
-    parser.add_argument("--max-steps", type=int, default=3000)
-    parser.add_argument("--video-out-path", default="outputs/tasks2_26_eval")
-    parser.add_argument("--seed", type=int, default=100)
-    return parser
-
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    args = build_argparser().parse_args()
-    _patch_env_resolution()
-    run_eval_task(
-        task_id=args.task_id,
-        num_trials_per_task=args.num_trials_per_task,
-        adapter_spec=args.adapter_spec,
-        adapter_kwargs=ec.parse_adapter_kwargs(args.adapter_kwargs),
-        resize_size=args.resize_size,
-        replan_steps=args.replan_steps,
-        num_steps_wait=args.num_steps_wait,
-        max_steps=args.max_steps,
-        video_out_path=args.video_out_path,
-        seed=args.seed,
-    )
