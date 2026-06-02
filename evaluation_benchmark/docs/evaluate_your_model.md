@@ -42,11 +42,16 @@ All of them use the same external contract: `obs + prompt -> action chunk`.
 
 ```bash
 cd evaluation_benchmark
-python scripts/run_all_tasks1_26_until_stage_nonzero.py \
+python scripts/run_all_tasks1_26.py \
   --adapter-spec /abs/path/to/your_adapter.py:build_adapter \
   --adapter-kwargs '{"checkpoint_dir": "/abs/path/to/your_checkpoint"}' \
+  --num-trials-per-task 20 \
+  --seed 100 \
   --out-root outputs/your_model_eval_1_26
 ```
+
+This wrapper records every episode. It does not retry seeds and does not filter for non-zero stage scores.
+The sweep uses the benchmark reference stage/goal checkers, so external model evaluation follows the same 1-26 scoring setting as the reference evaluation path.
 
 `--adapter-spec` points to a Python file and factory function:
 

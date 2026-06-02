@@ -25,7 +25,7 @@ Users only need to provide a policy adapter that maps environment observations p
 - `scripts/eval_task1_only.py`
 - `scripts/eval_tasks2_26.py`
 - `scripts/eval_common.py`
-- `scripts/run_all_tasks1_26_until_stage_nonzero.py`
+- `scripts/run_all_tasks1_26.py`
 - `reference_evaluation/task1_nomap_reference/eval_task1_nomap_reference.py`
 - `reference_evaluation/tasks2_26_vlm5_reference/eval_tasks2_26_vlm_vla.py`
 
@@ -183,15 +183,17 @@ So pour stage is mainly a process metric, while goal success is the final state 
 
 The batch runner is:
 
-- `scripts/run_all_tasks1_26_until_stage_nonzero.py`
+- `scripts/run_all_tasks1_26.py`
 
 Its logic is:
 
-1. iterate task2..26 in order
-2. start from `seed=100`
-3. if `stage=0`, try the next seed
-4. stop the current task when `stage > 0` is first observed
-5. record results into `attempts.tsv` and `task_summary.tsv`
+1. iterate tasks 1..26 in order
+2. run `num_trials_per_task` episodes for every task
+3. use `seed + ep` for episode seeds
+4. record every episode, including zero-stage and failed episodes
+5. aggregate results into `episodes.tsv`, `task_summary.tsv`, `summary.json`, and `aggregate.json`
+
+The standard batch runner does not retry seeds and does not filter for non-zero stage scores.
 
 ## 10. What users need to change for their own model
 
@@ -224,8 +226,9 @@ In most cases users do **not** need to rewrite:
 Typical output artifacts are:
 
 - rollout videos
-- `attempts.tsv`
+- `episodes.tsv`
 - `task_summary.tsv`
-- optional JSONL attempt log from the batch runner
+- `summary.json`
+- `aggregate.json`
 
 These files are the evaluation outputs. They are not part of the benchmark code itself.

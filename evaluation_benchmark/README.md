@@ -40,7 +40,7 @@ evaluation_benchmark/
     policy_adapter.py
     example_policy_adapter_template.py
     eval_common.py
-    run_all_tasks1_26_until_stage_nonzero.py
+    run_all_tasks1_26.py
   reference_evaluation/
     README.md
   async_vlm26_reference/
@@ -65,13 +65,16 @@ For a focused guide on plugging in your own checkpoint or model, see [Evaluate Y
 
 ```bash
 cd evaluation_benchmark
-python scripts/run_all_tasks1_26_until_stage_nonzero.py \
+python scripts/run_all_tasks1_26.py \
   --adapter-spec /abs/path/to/your_adapter.py:build_adapter \
   --adapter-kwargs '{"checkpoint_dir": "/abs/path/to/ckpt"}' \
-  --out-root outputs/tasks1_26_until_stage_nonzero
+  --num-trials-per-task 20 \
+  --seed 100 \
+  --out-root outputs/tasks1_26_eval
 ```
 
 The sweep uses the benchmark reference stage/goal checkers, so external model evaluation follows the same 1-26 scoring setting as the reference evaluation path.
+This wrapper records every episode. It does not retry seeds and does not filter for non-zero stage scores.
 
 ## Adapter contract
 
