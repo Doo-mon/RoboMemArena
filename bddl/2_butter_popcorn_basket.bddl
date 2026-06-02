@@ -1,6 +1,6 @@
 (define (problem LIBERO_Coffee_Table_Manipulation)
   (:domain robosuite)
-  (:language Prepare a serving arrangement with cream, pudding and basket)
+  (:language Prepare a serving arrangement with butter, popcorn and basket)
     (:regions
       (basket_init_region
           (:target coffee_table)
@@ -13,7 +13,7 @@
             )
           )
       )
-      (cream_cheese_init_region
+      (butter_init_region
           (:target coffee_table)
           (:ranges (
               (-0.04 -0.04 0.0 0.0)
@@ -24,7 +24,7 @@
             )
           )
       )
-      (chocolate_pudding_init_region
+      (popcorn_init_region
           (:target coffee_table)
           (:ranges (
               (-0.04 -0.26 0.0 -0.22)
@@ -57,26 +57,26 @@
 
   (:objects
     basket_1 - basket
-    cream_cheese_1 - cream_cheese
-    chocolate_pudding_1 - chocolate_pudding
+    butter_1 - butter
+    popcorn_1 - popcorn
   )
 
   (:obj_of_interest
-    cream_cheese_1
+    butter_1
     basket_1
-    chocolate_pudding_1
+    popcorn_1
   )
 
   (:init
     (On basket_1 coffee_table_basket_init_region)
-    (On cream_cheese_1 coffee_table_cream_cheese_init_region)
-    (On chocolate_pudding_1 coffee_table_chocolate_pudding_init_region)
+    (On butter_1 coffee_table_butter_init_region)
+    (On popcorn_1 coffee_table_popcorn_init_region)
   )
 
   (:goal
-    (And 
-        (In cream_cheese_1 basket_1_contain_region) 
-        (In chocolate_pudding_1 basket_1_contain_region)
+    (And
+        (In butter_1 basket_1_contain_region)
+        (In popcorn_1 basket_1_contain_region)
     )
   )
 

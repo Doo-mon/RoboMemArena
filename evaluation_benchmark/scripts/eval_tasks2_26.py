@@ -338,8 +338,8 @@ def _pour_stage(range_thresh: float, min_steps: int, hold_angle: float | None = 
 def _task_specs(task_id: int) -> list[StageSpec]:
     if task_id == 2:
         return [
-            StageSpec("01_Place_Cream_Basket", _in_container_body("cream_cheese_1", "basket_1", 0.12, -0.05, 0.20)),
-            StageSpec("02_Place_Pudding_Basket", _in_container_body("chocolate_pudding_1", "basket_1", 0.12, -0.05, 0.20)),
+            StageSpec("01_Place_Butter_Basket", _in_container_body("butter_1", "basket_1", 0.12, -0.05, 0.20)),
+            StageSpec("02_Place_Popcorn_Basket", _in_container_body("popcorn_1", "basket_1", 0.12, -0.05, 0.20)),
         ]
     if task_id == 3:
         return [
