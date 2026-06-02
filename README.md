@@ -8,12 +8,14 @@ RoboMemArena is a comprehensive and challenging robotic memory benchmark with 26
 [![Project Page](https://img.shields.io/badge/Project-Page-76b900?style=for-the-badge)](https://robomemarena.github.io/)
 [![Leaderboard Results](https://img.shields.io/badge/Leaderboard-Results-007ec6?style=for-the-badge)](https://robomemarena.github.io/leaderboard.html)
 [![Dataset Hugging Face](https://img.shields.io/badge/Dataset-Hugging%20Face-f3b900?style=for-the-badge)](https://huggingface.co/datasets/RoboMemArenaBenchmark/RoboMemArena)
+[![Dataset ModelScope](https://img.shields.io/badge/Dataset-ModelScope-2f80ed?style=for-the-badge)](https://modelscope.cn/profile/haodong123)
 
 ## Dataset Structure
 
-The dataset is hosted on Hugging Face:
+The dataset is hosted on Hugging Face and mirrored on ModelScope:
 
 [![Dataset Hugging Face](https://img.shields.io/badge/Dataset-Hugging%20Face-f3b900?style=for-the-badge)](https://huggingface.co/datasets/RoboMemArenaBenchmark/RoboMemArena)
+[![Dataset ModelScope](https://img.shields.io/badge/Dataset-ModelScope-2f80ed?style=for-the-badge)](https://modelscope.cn/profile/haodong123)
 
 The released dataset is organized as:
 
