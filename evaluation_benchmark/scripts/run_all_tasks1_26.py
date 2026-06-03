@@ -49,6 +49,7 @@ def build_argparser() -> argparse.ArgumentParser:
     parser.add_argument("--task-end", type=int, default=26)
     parser.add_argument("--num-trials-per-task", type=int, default=1)
     parser.add_argument("--max-steps", type=int, default=3000)
+    parser.add_argument("--post-goal-steps", type=int, default=200)
     parser.add_argument("--resize-size", type=int, default=256)
     parser.add_argument("--replan-steps", type=int, default=5)
     parser.add_argument("--num-steps-wait", type=int, default=10)
@@ -75,6 +76,7 @@ def _run_task(
     replan_steps: int,
     num_steps_wait: int,
     max_steps: int,
+    post_goal_steps: int,
     video_dir: Path,
     seed: int,
 ) -> dict[str, Any]:
@@ -87,6 +89,7 @@ def _run_task(
             replan_steps=replan_steps,
             num_steps_wait=num_steps_wait,
             max_steps=max_steps,
+            post_goal_steps=post_goal_steps,
             video_out_path=str(video_dir),
             seed=seed,
             stage_checks=task1_eval.STAGE_CHECKS,
@@ -101,6 +104,7 @@ def _run_task(
         replan_steps=replan_steps,
         num_steps_wait=num_steps_wait,
         max_steps=max_steps,
+        post_goal_steps=post_goal_steps,
         video_out_path=str(video_dir),
         seed=seed,
     )
@@ -199,6 +203,7 @@ def main() -> None:
                     replan_steps=args.replan_steps,
                     num_steps_wait=args.num_steps_wait,
                     max_steps=args.max_steps,
+                    post_goal_steps=args.post_goal_steps,
                     video_dir=video_dir,
                     seed=args.seed,
                 )

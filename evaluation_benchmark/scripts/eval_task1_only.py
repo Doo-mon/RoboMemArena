@@ -28,6 +28,7 @@ class Args:
     num_steps_wait: int = 10
     num_trials_per_task: int = 10
     max_steps: int = 2000
+    post_goal_steps: int = 200
     video_out_path: str = "outputs/task1_eval"
     seed: int = 100
 
@@ -43,6 +44,7 @@ def build_argparser() -> argparse.ArgumentParser:
     parser.add_argument("--num-steps-wait", type=int, default=10)
     parser.add_argument("--num-trials-per-task", type=int, default=10)
     parser.add_argument("--max-steps", type=int, default=2000)
+    parser.add_argument("--post-goal-steps", type=int, default=200)
     parser.add_argument("--video-out-path", default="outputs/task1_eval")
     parser.add_argument("--seed", type=int, default=100)
     return parser
@@ -59,6 +61,7 @@ def main(args: Args) -> dict:
         replan_steps=args.replan_steps,
         num_steps_wait=args.num_steps_wait,
         max_steps=args.max_steps,
+        post_goal_steps=args.post_goal_steps,
         video_out_path=args.video_out_path,
         seed=args.seed,
         stage_checks=STAGE_CHECKS,

@@ -22,7 +22,7 @@ for path in (LIBERO_ROOT,):
     if path_str not in sys.path:
         sys.path.insert(0, path_str)
 
-from policy_adapter import BasePolicyAdapter, ensure_action_chunk, load_policy_adapter
+from policy_adapter import BasePolicyAdapter, build_eval26_policy_input, ensure_action_chunk, load_policy_adapter
 
 
 LIBERO_DUMMY_ACTION = [0.0] * 6 + [-1.0]
@@ -247,6 +247,7 @@ def run_episode_with_stages(
     replan_steps: int,
     num_steps_wait: int,
     max_steps: int,
+    post_goal_steps: int,
     stage_checks: list[tuple[str, Callable[[Any], bool]]],
     goal_monitor_dict: dict[str, list[tuple[str, str]]],
     stage_checks_sequential: bool,
@@ -257,6 +258,8 @@ def run_episode_with_stages(
     action_plan: deque[np.ndarray] = deque()
     stage_done = {name: False for name, _ in stage_checks}
     t = 0
+    all_stages_logged = False
+    goal_reached_t: int | None = None
 
     try:
         while t < max_steps + num_steps_wait:
@@ -265,15 +268,16 @@ def run_episode_with_stages(
                 t += 1
                 continue
 
-            img = obs.get("agentview_image") or obs.get("agentview_rgb")
-            wrist = obs.get("robot0_eye_in_hand_image") or obs.get("wrist_image")
-            if img is not None:
-                replay.append(np.asarray(img))
-            if wrist is not None:
-                replay_wrist.append(np.asarray(wrist))
+            adapter_obs, processed_main, processed_wrist = build_eval26_policy_input(
+                raw_obs=obs,
+                prompt=prompt,
+                resize_size=resize_size,
+            )
+            replay.append(processed_main)
+            replay_wrist.append(processed_wrist)
 
             if not action_plan:
-                actions = ensure_action_chunk(adapter.infer_actions(obs=obs, prompt=prompt, resize_size=resize_size))
+                actions = ensure_action_chunk(adapter.infer_actions(obs=adapter_obs, prompt=prompt, resize_size=resize_size))
                 action_plan.extend(actions[:replan_steps])
 
             action = action_plan.popleft()
@@ -293,11 +297,18 @@ def run_episode_with_stages(
                         stage_done[name] = True
                         logging.info(f"  [t={t}] Stage completed: {name}")
 
-            if all(stage_done.values()):
+            if all(stage_done.values()) and not all_stages_logged:
                 logging.info(f"  [t={t}] All stages completed.")
-                break
+                all_stages_logged = True
+
+            goal_success = check_goal_success(env, goal_monitor_dict) if goal_monitor_dict else False
+            if goal_success and goal_reached_t is None:
+                goal_reached_t = t
+                logging.info(f"  [t={t}] Goal reached. Continuing {post_goal_steps} more steps before exit.")
 
             if done:
+                break
+            if goal_reached_t is not None and (t - goal_reached_t) >= post_goal_steps:
                 break
             t += 1
     except Exception as exc:
@@ -317,6 +328,7 @@ def run_episode_simple(
     replan_steps: int,
     num_steps_wait: int,
     max_steps: int,
+    post_goal_steps: int,
     goal_monitor_dict: dict[str, list[tuple[str, str]]],
 ) -> tuple[bool, bool, list[np.ndarray], list[np.ndarray]]:
     obs = env.reset()
@@ -325,6 +337,7 @@ def run_episode_simple(
     action_plan: deque[np.ndarray] = deque()
     t = 0
     done_success = False
+    goal_reached_t: int | None = None
 
     try:
         while t < max_steps + num_steps_wait:
@@ -333,21 +346,28 @@ def run_episode_simple(
                 t += 1
                 continue
 
-            img = obs.get("agentview_image") or obs.get("agentview_rgb")
-            wrist = obs.get("robot0_eye_in_hand_image") or obs.get("wrist_image")
-            if img is not None:
-                replay.append(np.asarray(img))
-            if wrist is not None:
-                replay_wrist.append(np.asarray(wrist))
+            adapter_obs, processed_main, processed_wrist = build_eval26_policy_input(
+                raw_obs=obs,
+                prompt=prompt,
+                resize_size=resize_size,
+            )
+            replay.append(processed_main)
+            replay_wrist.append(processed_wrist)
 
             if not action_plan:
-                actions = ensure_action_chunk(adapter.infer_actions(obs=obs, prompt=prompt, resize_size=resize_size))
+                actions = ensure_action_chunk(adapter.infer_actions(obs=adapter_obs, prompt=prompt, resize_size=resize_size))
                 action_plan.extend(actions[:replan_steps])
 
             action = action_plan.popleft()
             obs, _, done, _ = env.step(action.tolist())
+            goal_success = check_goal_success(env, goal_monitor_dict) if goal_monitor_dict else False
+            if goal_success and goal_reached_t is None:
+                goal_reached_t = t
+                logging.info(f"  [t={t}] Goal reached. Continuing {post_goal_steps} more steps before exit.")
             if done:
                 done_success = True
+                break
+            if goal_reached_t is not None and (t - goal_reached_t) >= post_goal_steps:
                 break
             t += 1
     except Exception as exc:
@@ -364,6 +384,7 @@ def run_eval(
     replan_steps: int,
     num_steps_wait: int,
     max_steps: int,
+    post_goal_steps: int,
     video_out_path: str,
     seed: int,
     adapter: BasePolicyAdapter | None = None,
@@ -433,6 +454,7 @@ def run_eval(
                     replan_steps=replan_steps,
                     num_steps_wait=num_steps_wait,
                     max_steps=max_steps,
+                    post_goal_steps=post_goal_steps,
                     stage_checks=stage_checks_list,
                     goal_monitor_dict=goal_monitor_dict,
                     stage_checks_sequential=stage_checks_sequential,
@@ -441,7 +463,7 @@ def run_eval(
                 for name in stage_done:
                     stage_totals[name] += int(stage_done[name])
                 goal_succ_cnt += int(goal_success)
-                base_name = get_video_basename(task_id, ep, current_seed, score)
+                base_name = get_video_basename(task_id, ep, current_seed, goal_success if goal_monitor_dict else score)
                 ep_summary = {
                     "ep": ep,
                     "seed": current_seed,
@@ -458,11 +480,17 @@ def run_eval(
                     replan_steps=replan_steps,
                     num_steps_wait=num_steps_wait,
                     max_steps=max_steps,
+                    post_goal_steps=post_goal_steps,
                     goal_monitor_dict=goal_monitor_dict,
                 )
                 env_done_cnt += int(env_done_success)
                 goal_succ_cnt += int(goal_success)
-                base_name = get_video_basename(task_id, ep, current_seed, env_done_success)
+                base_name = get_video_basename(
+                    task_id,
+                    ep,
+                    current_seed,
+                    goal_success if goal_monitor_dict else env_done_success,
+                )
                 ep_summary = {
                     "ep": ep,
                     "seed": current_seed,

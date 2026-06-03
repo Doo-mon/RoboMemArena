@@ -12,7 +12,7 @@ import numpy as np
 from scipy.spatial.transform import Rotation as R
 
 import eval_common as ec
-from policy_adapter import BasePolicyAdapter, ensure_action_chunk, load_policy_adapter
+from policy_adapter import BasePolicyAdapter, build_eval26_policy_input, ensure_action_chunk, load_policy_adapter
 
 
 @dataclasses.dataclass
@@ -530,6 +530,7 @@ def run_episode_with_stateful_stages(
     replan_steps: int,
     num_steps_wait: int,
     max_steps: int,
+    post_goal_steps: int,
     stage_specs: list[StageSpec],
     goal_monitor_dict: dict[str, list[tuple[str, str]]],
     goal_check_override: Callable[[Any], bool] | None,
@@ -543,6 +544,8 @@ def run_episode_with_stateful_stages(
     t = 0
     state: dict[str, Any] | None = None
     current_stage_start = 0
+    all_stages_logged = False
+    goal_reached_t: int | None = None
 
     try:
         while t < max_steps + num_steps_wait:
@@ -555,15 +558,16 @@ def run_episode_with_stateful_stages(
                 state = _build_initial_state(env)
                 current_stage_start = state["step_idx"]
 
-            img = obs.get("agentview_image") or obs.get("agentview_rgb")
-            wrist = obs.get("robot0_eye_in_hand_image") or obs.get("wrist_image")
-            if img is not None:
-                replay.append(np.asarray(img))
-            if wrist is not None:
-                replay_wrist.append(np.asarray(wrist))
+            adapter_obs, processed_main, processed_wrist = build_eval26_policy_input(
+                raw_obs=obs,
+                prompt=prompt,
+                resize_size=resize_size,
+            )
+            replay.append(processed_main)
+            replay_wrist.append(processed_wrist)
 
             if not action_plan:
-                actions = ensure_action_chunk(adapter.infer_actions(obs=obs, prompt=prompt, resize_size=resize_size))
+                actions = ensure_action_chunk(adapter.infer_actions(obs=adapter_obs, prompt=prompt, resize_size=resize_size))
                 action_plan.extend(actions[:replan_steps])
 
             action = action_plan.popleft()
@@ -578,10 +582,20 @@ def run_episode_with_stateful_stages(
                     stage_idx += 1
                     current_stage_start = state["step_idx"]
 
-            if stage_idx >= len(stage_specs):
+            if stage_idx >= len(stage_specs) and not all_stages_logged:
                 logging.info(f"  [t={t}] All stages completed.")
-                break
+                all_stages_logged = True
+
+            if goal_check_override is not None:
+                goal_success = goal_check_override(env)
+            else:
+                goal_success = ec.check_goal_success(env, goal_monitor_dict) if goal_monitor_dict else False
+            if goal_success and goal_reached_t is None:
+                goal_reached_t = t
+                logging.info(f"  [t={t}] Goal reached. Continuing {post_goal_steps} more steps before exit.")
             if done:
+                break
+            if goal_reached_t is not None and (t - goal_reached_t) >= post_goal_steps:
                 break
             t += 1
     except Exception as exc:
@@ -615,6 +629,7 @@ def run_eval_task(
     replan_steps: int,
     num_steps_wait: int,
     max_steps: int,
+    post_goal_steps: int,
     video_out_path: str,
     seed: int,
     adapter: BasePolicyAdapter | None = None,
@@ -678,6 +693,7 @@ def run_eval_task(
                 replan_steps=replan_steps,
                 num_steps_wait=num_steps_wait,
                 max_steps=max_steps,
+                post_goal_steps=post_goal_steps,
                 stage_specs=stage_specs,
                 goal_monitor_dict=goal_monitor_dict,
                 goal_check_override=goal_check_override,
@@ -746,6 +762,7 @@ def build_argparser() -> argparse.ArgumentParser:
     parser.add_argument("--num-steps-wait", type=int, default=10)
     parser.add_argument("--num-trials-per-task", type=int, default=1)
     parser.add_argument("--max-steps", type=int, default=3000)
+    parser.add_argument("--post-goal-steps", type=int, default=200)
     parser.add_argument("--video-out-path", default="outputs/tasks2_26_eval")
     parser.add_argument("--seed", type=int, default=100)
     return parser
@@ -764,6 +781,7 @@ if __name__ == "__main__":
         replan_steps=args.replan_steps,
         num_steps_wait=args.num_steps_wait,
         max_steps=args.max_steps,
+        post_goal_steps=args.post_goal_steps,
         video_out_path=args.video_out_path,
         seed=args.seed,
     )
