@@ -129,6 +129,27 @@ def _body_pos(env: Any, name: str) -> np.ndarray | None:
     return np.asarray(env.sim.data.body_xpos[bid], dtype=np.float32)
 
 
+def _resolve_site_id(env: Any, name: str) -> int | None:
+    variants = [name]
+    if not name.endswith("_main"):
+        variants.append(f"{name}_main")
+    if name.endswith("_main"):
+        variants.append(name[:-5])
+    for v in variants:
+        try:
+            return env.sim.model.site_name2id(v)
+        except Exception:
+            continue
+    return None
+
+
+def _site_pos(env: Any, name: str) -> np.ndarray | None:
+    sid = _resolve_site_id(env, name)
+    if sid is None:
+        return None
+    return np.asarray(env.sim.data.site_xpos[sid], dtype=np.float32)
+
+
 def _is_obj_in_container(
     env: Any,
     obj_name: str,
@@ -144,6 +165,25 @@ def _is_obj_in_container(
     xy_dist = float(np.linalg.norm(obj_pos[:2] - ctr_pos[:2]))
     z_delta = float(obj_pos[2] - ctr_pos[2])
     return xy_dist <= xy_thresh and z_low <= z_delta <= z_high
+
+
+def _is_obj_in_site_region(
+    env: Any,
+    obj_name: str,
+    site_name: str,
+    x_thresh: float = 0.20,
+    y_thresh: float = 0.20,
+    z_low: float = -1.0,
+    z_high: float = 1.0,
+) -> bool:
+    obj_pos = _body_pos(env, obj_name)
+    site_pos = _site_pos(env, site_name)
+    if obj_pos is None or site_pos is None:
+        return False
+    x_diff = abs(float(obj_pos[0] - site_pos[0]))
+    y_diff = abs(float(obj_pos[1] - site_pos[1]))
+    z_delta = float(obj_pos[2] - site_pos[2])
+    return x_diff <= x_thresh and y_diff <= y_thresh and z_low <= z_delta <= z_high
 
 
 def make_obj_in_basket_check(obj_body_name: str) -> Callable[[Any], bool]:
@@ -207,11 +247,23 @@ def check_goal_success(env: Any, monitor_dict: dict[str, list[tuple[str, str]]])
         obj_ok = True
         for rel, target in conditions:
             if rel == "In":
-                if not _is_obj_in_container(env, obj, target):
+                in_body = _is_obj_in_container(env, obj, target)
+                in_site = _is_obj_in_site_region(env, obj, target)
+                if not (in_body or in_site):
                     obj_ok = False
                     break
             elif rel == "On":
-                if not _is_obj_in_container(env, obj, target, xy_thresh=0.10, z_low=-0.05, z_high=0.15):
+                on_body = _is_obj_in_container(env, obj, target, xy_thresh=0.10, z_low=-0.05, z_high=0.15)
+                on_site = _is_obj_in_site_region(
+                    env,
+                    obj,
+                    target,
+                    x_thresh=0.10,
+                    y_thresh=0.10,
+                    z_low=-0.05,
+                    z_high=0.15,
+                )
+                if not (on_body or on_site):
                     obj_ok = False
                     break
         if not obj_ok:
