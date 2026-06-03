@@ -368,7 +368,7 @@ def run_episode_with_stages(
 
     num_done = sum(1 for name, _ in stage_checks if stage_done[name])
     score = 100.0 * num_done / len(stage_checks)
-    goal_success = check_goal_success(env, goal_monitor_dict) if goal_monitor_dict else False
+    goal_success = goal_reached_t is not None
     return score, stage_done, goal_success, replay, replay_wrist
 
 
@@ -425,7 +425,7 @@ def run_episode_simple(
     except Exception as exc:
         logging.exception(f"Episode failed: {exc}")
 
-    goal_success = check_goal_success(env, goal_monitor_dict) if goal_monitor_dict else False
+    goal_success = goal_reached_t is not None
     return done_success, goal_success, replay, replay_wrist
 
 

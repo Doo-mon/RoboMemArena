@@ -603,10 +603,7 @@ def run_episode_with_stateful_stages(
 
     num_done = sum(1 for ok in stage_done.values() if ok)
     score = 100.0 * num_done / max(1, len(stage_specs))
-    if goal_check_override is not None:
-        goal_success = goal_check_override(env)
-    else:
-        goal_success = ec.check_goal_success(env, goal_monitor_dict) if goal_monitor_dict else False
+    goal_success = goal_reached_t is not None
     return score, stage_done, goal_success, replay, replay_wrist
 
 
