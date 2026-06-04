@@ -27,6 +27,7 @@ The released dataset is organized as:
 <dataset_root>/
 ├── <category_1>/
 │   └── 1_cookies_tomato_basket_dataset/
+│       ├── full_trajectory/      # Complete long-horizon HDF5 trajectories
 │       └── subtask_data/         # Keyframe-annotated HDF5 episodes (used for training)
 │           ├── pick_cookies_0_seed100_task1.hdf5
 │           ├── pick_cookies_0_seed101_task1.hdf5
@@ -47,10 +48,16 @@ episode. If your training target is the complete task rather than individual
 subtasks, group files by `task_id` and `seed`, then concatenate the ordered
 subtask episodes before training.
 
+The ModelScope mirror also provides `full_trajectory/` files for direct
+download. These files already store complete long-horizon trajectories, so users
+who do not need subtask-level training segments can use them directly without
+concatenating `subtask_data/` files.
+
 ### Key Directories
 
 | Directory | Description |
 |-----------|-------------|
+| **full_trajectory/** | Complete long-horizon task trajectories, directly downloadable from the ModelScope release |
 | **subtask_data/** | Sub-episodes with **keyframe annotations**; each HDF5 contains `data/demo_*` with `actions`, `obs/agentview_rgb`, `obs/eye_in_hand_rgb`, `obs/ee_states`, `obs/gripper_states`, `obs/joint_states` |
 
 ### HDF5 Format (subtask_data)
