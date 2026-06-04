@@ -9,8 +9,8 @@
       "task_name": "Put Cookies Sauce into Target Container in Order",
       "memory_type": "S",
       "challenge": "sequence",
-      "brief_description": "Pick and place cookies into the target container, then pick and place tomato sauce into the same target container.",
-      "task_block": "This is a sequential long-horizon task: first place cookies into the target container (the primitive labels call it basket), then place tomato sauce into the same target container. Remember whether cookies have already been placed; after that, switch to tomato sauce without skipping or repeating.",
+      "brief_description": "Pick and place cookies into the basket, then pick and place tomato sauce into the same container.",
+      "task_block": "This is a sequential long-horizon task: first place cookies into the basket, then place tomato sauce into the same container. Remember whether cookies have already been placed; after that, switch to tomato sauce without skipping or repeating.",
       "primitive_order": [
         {
           "stem": "pick_cookies",
@@ -38,8 +38,8 @@
       "task_name": "Put Butter Popcorn into Target Container in Order",
       "memory_type": "S",
       "challenge": "sequence",
-      "brief_description": "Pick and place butter into the target container, then pick and place popcorn into the same target container.",
-      "task_block": "This is a sequential long-horizon task: first place butter into the target container (the primitive labels call it basket), then place popcorn into the same target container. Use the visual history to decide whether the execution is still on the first object or has moved to the second object.",
+      "brief_description": "Pick and place butter into the basket, then pick and place popcorn into the same container.",
+      "task_block": "This is a sequential long-horizon task: first place butter into the basket, then place popcorn into the same container. Use the visual history to decide whether the execution is still on the first object or has moved to the second object.",
       "primitive_order": [
         {
           "stem": "pick_butter",
@@ -67,8 +67,8 @@
       "task_name": "Put Cream Pudding into Target Container in Order",
       "memory_type": "S",
       "challenge": "sequence",
-      "brief_description": "Pick and place cream into the target container, then pick and place pudding into the same target container.",
-      "task_block": "This is a sequential long-horizon task: first place cream into the target container (the primitive labels call it basket), then place pudding into the same target container. Remember whether the first object has already entered the target container, without skipping or repeating.",
+      "brief_description": "Pick and place cream into the basket, then pick and place pudding into the same container.",
+      "task_block": "This is a sequential long-horizon task: first place cream into the basket, then place pudding into the same container. Remember whether the first object has already entered the basket, without skipping or repeating.",
       "notes": "The appendix row mentions cream/chocolate, while the local fullvlm_v2 data uses cream/pudding.",
       "primitive_order": [
         {
