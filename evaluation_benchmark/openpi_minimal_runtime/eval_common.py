@@ -199,8 +199,8 @@ def _is_obj_in_site_region(
     site_name: str,
     x_thresh: float = 0.20,
     y_thresh: float = 0.20,
-    z_low: float = -1.0,
-    z_high: float = 1.0,
+    z_low: float = -0.20,
+    z_high: float = 0.20,
 ) -> bool:
     obj_pos = _body_pos(env, obj_name)
     site_pos = _site_pos(env, site_name)
