@@ -47,7 +47,7 @@ def build_argparser() -> argparse.ArgumentParser:
     parser.add_argument("--adapter-kwargs", default="")
     parser.add_argument("--task-start", type=int, default=1)
     parser.add_argument("--task-end", type=int, default=26)
-    parser.add_argument("--num-trials-per-task", type=int, default=1)
+    parser.add_argument("--num-trials-per-task", type=int, default=50)
     parser.add_argument("--max-steps", type=int, default=3000)
     parser.add_argument("--post-goal-steps", type=int, default=200)
     parser.add_argument("--resize-size", type=int, default=256)
