@@ -105,10 +105,34 @@ class TrainConfig:
     policy_metadata: dict[str, Any] | None = None
 
 
+_PI05_ROBOMEMARENA_TRAINING_DETAILS = {
+    "model": "Pi0Config(pi05=True, action_horizon=10, discrete_state_input=False)",
+    "data": {
+        "base_config": "DataConfig(prompt_from_task=True)",
+        "extra_delta_transform": False,
+    },
+    "initialization": "pi05_base/params",
+    "batch_size": 128,
+    "num_workers": 32,
+    "optimizer": "AdamW",
+    "clip_gradient_norm": 1.0,
+    "lr_schedule": {
+        "type": "CosineDecaySchedule",
+        "warmup_steps": 10_000,
+        "peak_lr": 5e-5,
+        "decay_steps": 1_000_000,
+        "decay_lr": 5e-5,
+    },
+    "ema_decay": 0.999,
+    "num_train_steps": 40_000,
+}
+
+
 _DEFAULT_PI05_LIBERO = TrainConfig(
     name="pi05_robomemarena",
     model=pi0_config.Pi0Config(pi05=True, action_horizon=10, discrete_state_input=False),
     data=MinimalLiberoDataConfig(asset_id="robomemarena_assets"),
+    policy_metadata={"baseline_training_details": _PI05_ROBOMEMARENA_TRAINING_DETAILS},
 )
 
 _CONFIGS: dict[str, TrainConfig] = {
