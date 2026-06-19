@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable
 
 import numpy as np
@@ -129,6 +131,62 @@ def _microwave_joint_angle(env: Any) -> float | None:
 def _tilt_from_quat(quat: np.ndarray) -> float:
     z_axis = R.from_quat(np.asarray(quat, dtype=np.float64)).as_matrix()[:, 2]
     return float(np.arccos(np.clip(z_axis[2], -1.0, 1.0)))
+
+def _body_tilt_angle(env: Any, name: str) -> float | None:
+    for cand in _name_variants(name):
+        try:
+            bid = env.sim.model.body_name2id(cand)
+            mat = np.asarray(env.sim.data.body_xmat[bid], dtype=np.float64).reshape(3, 3)
+            z_axis = mat[:, 2]
+            return float(np.arccos(np.clip(z_axis[2], -1.0, 1.0)))
+        except Exception:
+            continue
+    return None
+
+def _body_axis_tilts(env: Any, name: str) -> tuple[float, float, float] | None:
+    for cand in _name_variants(name):
+        try:
+            bid = env.sim.model.body_name2id(cand)
+            mat = np.asarray(env.sim.data.body_xmat[bid], dtype=np.float64).reshape(3, 3)
+            return tuple(float(np.arccos(np.clip(mat[:, i][2], -1.0, 1.0))) for i in range(3))
+        except Exception:
+            continue
+    return None
+
+def _append_task6_tilt_debug(
+    *,
+    step_idx: int,
+    stage_start: int,
+    stage_len: int,
+    tilt: float,
+    baseline: float | None,
+    deviation: float | None,
+    max_deviation: float | None,
+    moved: bool,
+    returned: bool,
+    axis_tilts: tuple[float, float, float] | None,
+) -> None:
+    path = os.environ.get("TASK6_TILT_TRACE_CSV")
+    if not path:
+        return
+    trace_path = Path(path)
+    trace_path.parent.mkdir(parents=True, exist_ok=True)
+    write_header = not trace_path.exists()
+    ax = axis_tilts if axis_tilts is not None else (np.nan, np.nan, np.nan)
+    with trace_path.open("a", encoding="utf-8") as f:
+        if write_header:
+            f.write(
+                "step_idx,stage_start,stage_len,tilt_z,baseline_z,deviation_z,"
+                "max_deviation_z,moved,returned,axis_x_tilt,axis_y_tilt,axis_z_tilt\n"
+            )
+        f.write(
+            f"{step_idx},{stage_start},{stage_len},{tilt:.8f},"
+            f"{baseline if baseline is not None else np.nan:.8f},"
+            f"{deviation if deviation is not None else np.nan:.8f},"
+            f"{max_deviation if max_deviation is not None else np.nan:.8f},"
+            f"{int(moved)},{int(returned)},"
+            f"{ax[0]:.8f},{ax[1]:.8f},{ax[2]:.8f}\n"
+        )
 
 def _build_initial_state(env: Any) -> dict[str, Any]:
     body_names = [str(x) for x in env.sim.model.body_names]
@@ -454,6 +512,73 @@ def _pour_stage(
 
     return check
 
+def _tomato_body_pour_stage(
+    move_thresh: float = 0.15,
+    return_thresh: float = 0.10,
+    min_steps: int = 10,
+    warmup: int = 5,
+) -> Callable[[Any, dict[str, Any], int], bool]:
+    def check(env: Any, state: dict[str, Any], stage_start: int) -> bool:
+        tilt = _body_tilt_angle(env, "tomato_sauce_1")
+        if tilt is None:
+            return False
+        axis_tilts = _body_axis_tilts(env, "tomato_sauce_1")
+        step_idx = int(state.get("step_idx", len(state.get("tilt_angles", []))))
+        records = state.setdefault("task6_tomato_tilt_records", [])
+        if not records or int(records[-1][0]) != step_idx:
+            records.append((step_idx, float(tilt)))
+        vals = np.asarray([v for step, v in records if int(step) >= int(stage_start)], dtype=np.float32)
+        vals = vals[np.isfinite(vals)]
+        if len(vals) < min_steps:
+            _append_task6_tilt_debug(
+                step_idx=step_idx,
+                stage_start=stage_start,
+                stage_len=len(vals),
+                tilt=float(tilt),
+                baseline=None,
+                deviation=None,
+                max_deviation=None,
+                moved=False,
+                returned=False,
+                axis_tilts=axis_tilts,
+            )
+            return False
+        baseline = float(np.median(vals[: max(1, min(warmup, len(vals)))]))
+        deviations = np.abs(vals - baseline)
+        moved = np.where(deviations >= move_thresh)[0]
+        max_deviation = float(np.max(deviations)) if len(deviations) else 0.0
+        returned = False
+        if len(moved) == 0:
+            _append_task6_tilt_debug(
+                step_idx=step_idx,
+                stage_start=stage_start,
+                stage_len=len(vals),
+                tilt=float(tilt),
+                baseline=baseline,
+                deviation=float(abs(float(tilt) - baseline)),
+                max_deviation=max_deviation,
+                moved=False,
+                returned=False,
+                axis_tilts=axis_tilts,
+            )
+            return False
+        returned = int(np.sum(deviations[int(moved[0]) + 1 :] <= return_thresh)) > 0
+        _append_task6_tilt_debug(
+            step_idx=step_idx,
+            stage_start=stage_start,
+            stage_len=len(vals),
+            tilt=float(tilt),
+            baseline=baseline,
+            deviation=float(abs(float(tilt) - baseline)),
+            max_deviation=max_deviation,
+            moved=True,
+            returned=returned,
+            axis_tilts=axis_tilts,
+        )
+        return returned
+
+    return check
+
 def _task_specs(task_id: int) -> list[StageSpec]:
     if task_id == 2:
         return [
@@ -491,9 +616,9 @@ def _task_specs(task_id: int) -> list[StageSpec]:
         ]
     if task_id == 6:
         return [
-            StageSpec("01_Pour_One", _pour_stage(0.30, 10)),
-            StageSpec("02_Pour_Two", _pour_stage(0.30, 10)),
-            StageSpec("03_Place_Bowl_Drainer", _in_container_body("tomato_sauce_1", "bowl_drainer_1", 0.15, -0.05, 0.20)),
+            StageSpec("01_Lift_Tomato_Sauce", _lift_rel("tomato_sauce_1", 0.03)),
+            StageSpec("02_Pour_One", _tomato_body_pour_stage(0.15, 0.10)),
+            StageSpec("03_Pour_Two", _tomato_body_pour_stage(0.15, 0.10)),
         ]
     if task_id == 7:
         return [
