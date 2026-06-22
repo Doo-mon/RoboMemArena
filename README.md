@@ -10,6 +10,14 @@ RoboMemArena is a comprehensive and challenging robotic memory benchmark with 26
 [![Dataset Hugging Face](https://img.shields.io/badge/Dataset-Hugging%20Face-f3b900?style=for-the-badge)](https://huggingface.co/datasets/RoboMemArenaBenchmark/RoboMemArena)
 [![Dataset ModelScope](https://img.shields.io/badge/Dataset-ModelScope-2f80ed?style=for-the-badge)](https://modelscope.cn/profile/haodong123)
 
+## News
+
+- **Jun. 2026** We refreshed the affected dataset split and uploaded the corrected version.
+- **Jun. 2026** We corrected the subtask annotation for the affected task and uploaded the updated data.
+- **Jun. 2026** We corrected the Task 6 evaluation logic in `evaluation_benchmark/scripts/task2_26_reference_stage.py`.
+- **Jun. 2026** We refreshed the Task 4 and Task 5 data with randomized object placement to improve the robustness of memory evaluation. The latest version is now available on ModelScope; the Hugging Face mirror will be released soon.
+- **Jun. 2026** We increased the memory dependency of Tasks 1-3 by introducing two identical baskets in the scene.
+
 ## Dataset Structure
 
 The dataset is hosted on Hugging Face and mirrored on ModelScope:
