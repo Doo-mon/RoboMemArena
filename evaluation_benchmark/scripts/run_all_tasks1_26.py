@@ -20,6 +20,7 @@ EPISODES_HEADER = [
     "ep",
     "seed",
     "score_pct",
+    "tsr_success",
     "goal",
     "prompt",
     "video_dir",
@@ -30,6 +31,7 @@ TASK_SUMMARY_HEADER = [
     "num_trials",
     "seed_start",
     "average_score_pct",
+    "tsr_success_rate_pct",
     "goal_success_rate_pct",
     "prompt",
     "video_dir",
@@ -130,6 +132,7 @@ def _write_outputs(out_root: Path, results: list[dict[str, Any]], seed: int) -> 
                         episode["ep"],
                         episode["seed"],
                         f"{float(episode['score_pct']):.1f}",
+                        "Y" if episode.get("tsr_success", False) else "N",
                         "Y" if episode["goal_success"] else "N",
                         result["prompt"],
                         result["video_dir"],
@@ -146,6 +149,7 @@ def _write_outputs(out_root: Path, results: list[dict[str, Any]], seed: int) -> 
                     len(result["episodes"]),
                     seed,
                     f"{float(result['average_score_pct']):.1f}",
+                    f"{float(result.get('tsr_success_rate_pct', 0.0)):.1f}",
                     f"{float(result['goal_success_rate_pct']):.1f}",
                     result["prompt"],
                     result["video_dir"],
@@ -162,6 +166,9 @@ def _write_outputs(out_root: Path, results: list[dict[str, Any]], seed: int) -> 
         "seed_start": seed,
         "macro_average_score_pct": (
             sum(float(result["average_score_pct"]) for result in results) / max(1, num_tasks)
+        ),
+        "macro_tsr_success_rate_pct": (
+            sum(float(result.get("tsr_success_rate_pct", 0.0)) for result in results) / max(1, num_tasks)
         ),
         "macro_goal_success_rate_pct": (
             sum(float(result["goal_success_rate_pct"]) for result in results) / max(1, num_tasks)

@@ -484,6 +484,7 @@ def run_eval(
     stage_totals = {name: 0 for name, _ in stage_checks_list} if use_stage_check else {}
     goal_succ_cnt = 0
     env_done_cnt = 0
+    tsr_succ_cnt = 0
     episodes: list[dict[str, Any]] = []
 
     try:
@@ -514,12 +515,15 @@ def run_eval(
                 total_score += score
                 for name in stage_done:
                     stage_totals[name] += int(stage_done[name])
+                tsr_success = bool(stage_done) and all(stage_done.values())
+                tsr_succ_cnt += int(tsr_success)
                 goal_succ_cnt += int(goal_success)
                 base_name = get_video_basename(task_id, ep, current_seed, goal_success if goal_monitor_dict else score)
                 ep_summary = {
                     "ep": ep,
                     "seed": current_seed,
                     "score_pct": float(score),
+                    "tsr_success": bool(tsr_success),
                     "goal_success": bool(goal_success),
                     "stage_done": stage_done,
                 }
@@ -536,6 +540,8 @@ def run_eval(
                     goal_monitor_dict=goal_monitor_dict,
                 )
                 env_done_cnt += int(env_done_success)
+                tsr_success = bool(env_done_success)
+                tsr_succ_cnt += int(tsr_success)
                 goal_succ_cnt += int(goal_success)
                 base_name = get_video_basename(
                     task_id,
@@ -547,6 +553,7 @@ def run_eval(
                     "ep": ep,
                     "seed": current_seed,
                     "score_pct": 100.0 if env_done_success else 0.0,
+                    "tsr_success": bool(tsr_success),
                     "goal_success": bool(goal_success),
                     "env_done_success": bool(env_done_success),
                 }
@@ -582,6 +589,8 @@ def run_eval(
     else:
         avg_score = 100.0 * env_done_cnt / max(1, n)
         logging.info(f"Final result - env done success rate: {env_done_cnt}/{n} ({avg_score:.1f}%)")
+    tsr_pct = 100.0 * tsr_succ_cnt / max(1, n)
+    logging.info(f"Final result - TSR all-stage success rate: {tsr_succ_cnt}/{n} ({tsr_pct:.1f}%)")
     goal_pct = 100.0 * goal_succ_cnt / max(1, n) if goal_monitor_dict else 0.0
     if goal_monitor_dict:
         logging.info(f"Final result - BDDL goal success rate: {goal_succ_cnt}/{n} ({goal_pct:.1f}%)")
@@ -595,6 +604,7 @@ def run_eval(
         "bddl_path": str(bddl_path),
         "video_dir": str(video_dir),
         "average_score_pct": float(avg_score),
+        "tsr_success_rate_pct": float(tsr_pct),
         "goal_success_rate_pct": float(goal_pct),
         "episodes": episodes,
     }

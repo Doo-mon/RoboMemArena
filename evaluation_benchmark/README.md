@@ -102,4 +102,5 @@ These folders are examples of how to connect a planner/policy stack to RoboMemAr
 Metric names:
 
 - `CSR`: final BDDL goal success rate
-- `TSR`: stage/process completion score
+- `TSR`: all-stage success rate; an episode counts as successful only when every reference stage is completed
+- `average_score_pct`: diagnostic partial stage/process completion score

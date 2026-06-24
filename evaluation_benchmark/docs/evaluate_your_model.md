@@ -88,6 +88,7 @@ export VLA_CONFIG=<your_vla_config_name>  # optional; default runner value is pi
 ## Metrics
 
 - `CSR`: final BDDL goal success rate.
-- `TSR`: stage/process completion score.
+- `TSR`: all-stage success rate. An episode counts as TSR success only when every reference stage is completed.
+- `average_score_pct`: diagnostic partial stage/process completion score.
 
 For official reporting, use the same adapter and scoring path consistently across all 1-26 tasks.

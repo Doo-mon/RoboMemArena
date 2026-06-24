@@ -670,6 +670,7 @@ def run_eval_task(
     total_score = 0.0
     stage_totals = {spec.name: 0 for spec in stage_specs}
     goal_succ_cnt = 0
+    tsr_succ_cnt = 0
     episodes: list[dict[str, Any]] = []
 
     try:
@@ -698,6 +699,8 @@ def run_eval_task(
             total_score += score
             for name, ok in stage_done.items():
                 stage_totals[name] += int(ok)
+            tsr_success = bool(stage_done) and all(stage_done.values())
+            tsr_succ_cnt += int(tsr_success)
             goal_succ_cnt += int(goal_success)
 
             base_name = ec.get_video_basename(task_id, ep, current_seed, goal_success)
@@ -715,6 +718,7 @@ def run_eval_task(
                     "ep": ep,
                     "seed": current_seed,
                     "score_pct": float(score),
+                    "tsr_success": bool(tsr_success),
                     "goal_success": bool(goal_success),
                     "stage_done": stage_done,
                 }
@@ -732,6 +736,8 @@ def run_eval_task(
     logging.info(f"Final result - average stage success rate = {avg_score:.1f}%")
     for name, cnt in stage_totals.items():
         logging.info(f"  {name}: {cnt}/{n} ({(cnt / max(1, n)) * 100:.0f}%)")
+    tsr_pct = 100.0 * tsr_succ_cnt / max(1, n)
+    logging.info(f"Final result - TSR all-stage success rate: {tsr_succ_cnt}/{n} ({tsr_pct:.1f}%)")
     goal_pct = 100.0 * goal_succ_cnt / max(1, n)
     logging.info(f"Final result - BDDL goal success rate: {goal_succ_cnt}/{n} ({goal_pct:.1f}%)")
     logging.info(f"Video output: {video_dir}")
@@ -744,6 +750,7 @@ def run_eval_task(
         "bddl_path": str(bddl_path),
         "video_dir": str(video_dir),
         "average_score_pct": float(avg_score),
+        "tsr_success_rate_pct": float(tsr_pct),
         "goal_success_rate_pct": float(goal_pct),
         "episodes": episodes,
     }
