@@ -165,6 +165,7 @@ def _calc_microwave_handle_pos(env: Any) -> np.ndarray | None:
 
 def _microwave_joint_angle(env: Any) -> float | None:
     candidates = [
+        "microwave_1_microjoint",
         "microwave_1_door_joint",
         "microwave_1_hinge",
         "microwave_1_door_hinge",
@@ -448,30 +449,31 @@ def _drawer_closed_abs(
 
 def _microwave_open(
     joint_thresh: float,
-    fallback_x_thresh: float = 0.65,
+    fallback_dist_thresh: float = 0.08,
 ) -> Callable[[Any, dict[str, Any], int], bool]:
     def check(env: Any, state: dict[str, Any], stage_start: int) -> bool:
         angle = _microwave_joint_angle(env)
         if angle is not None:
             return abs(angle) > joint_thresh
-        handle_pos = _calc_microwave_handle_pos(env)
-        if handle_pos is None:
+        cur = _calc_microwave_handle_pos(env)
+        init = state.get("initial_microwave_handle_pos")
+        if cur is None or init is None:
             return False
-        return float(handle_pos[0]) < fallback_x_thresh
+        return float(np.linalg.norm(cur - init)) > fallback_dist_thresh
 
     return check
 
 
 def _microwave_closed(dist_thresh: float = 0.05) -> Callable[[Any, dict[str, Any], int], bool]:
     def check(env: Any, state: dict[str, Any], stage_start: int) -> bool:
+        angle = _microwave_joint_angle(env)
+        if angle is not None:
+            return abs(angle) < 0.15
         cur = _calc_microwave_handle_pos(env)
         init = state.get("initial_microwave_handle_pos")
         if cur is not None and init is not None:
             return float(np.linalg.norm(cur - init)) < dist_thresh
-        angle = _microwave_joint_angle(env)
-        if angle is None:
-            return False
-        return abs(angle) < 0.15
+        return False
 
     return check
 
